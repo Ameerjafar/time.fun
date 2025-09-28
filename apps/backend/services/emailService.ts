@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
 import otpGenerator from "otp-generator";
-
+import { redis } from '../cache/redis';
 export const emailService = async (email: string) => {
   const numericOtp = otpGenerator.generate(6, {
     upperCaseAlphabets: false,
@@ -26,7 +26,9 @@ export const emailService = async (email: string) => {
 
   try {
     const info = await transporter.sendMail(mailOption);
+    await redis.set(email, numericOtp, 'EX', '60');
     return { success: true, info, otp: numericOtp };
+
   } catch (error) {
     console.error("Error sending email:", error);
     throw new Error("Email not sent");

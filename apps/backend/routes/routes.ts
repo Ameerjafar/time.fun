@@ -1,7 +1,7 @@
 import express from 'express';
-import { authController } from '../controller/authController';
+import { authRoute } from './authRoute';
 
 export const routes = express.Router();
 
-routes.get('/auth', authController);
+routes.use('/auth', authRoute);
 
