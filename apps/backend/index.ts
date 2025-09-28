@@ -14,9 +14,6 @@ app.use(cors());
 app.use(express.json());
 app.use('/', routes);
 
-const allUser = await prisma.user.findMany({});
-    console.log("allUser", allUser);
-
 const port = process.env.BACKEND_PORT;
 app.listen(port, () => {
     console.log("backend is running on port number", port);
