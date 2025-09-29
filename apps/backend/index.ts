@@ -4,7 +4,6 @@ import cors from 'cors'
 
 import dotenv from 'dotenv';
 import { routes } from './routes/routes';
-import { prisma } from '@repo/db'
 dotenv.config();
 const app = express();
 
