@@ -6,7 +6,6 @@
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -15,7 +14,23 @@ datasource db {
 }
 
 model User {
-  id String @id @default(uuid())
-  email String 
-  lastLoggedAt DateTime
+  id                  String          @id @default(uuid())
+  name                String
+  email               String
+  dmPrice             Float?
+  GroupChatFixedPrice Float?
+  videoCallFixedPrice Float?
+  profilePicture      String?
+  createdAt           DateTime        @default(now())
+  lastLoggedAt        DateTime
+  userHoldTokens      UserHoldToken[]
+}
+
+model UserHoldToken {
+  tokenId   String   @id @default(uuid())
+  userId    String
+  token     Decimal
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
