@@ -16,6 +16,7 @@ datasource db {
 model User {
   id                  String          @id @default(uuid())
   name                String
+  role                ROLE
   email               String
   dmPrice             Float?
   GroupChatFixedPrice Float?
@@ -24,13 +25,30 @@ model User {
   createdAt           DateTime        @default(now())
   lastLoggedAt        DateTime
   userHoldTokens      UserHoldToken[]
+  createdToken        Tokens?
 }
 
 model UserHoldToken {
-  tokenId   String   @id @default(uuid())
+  id        String   @id @default(uuid())
+  tokenId   String
   userId    String
   token     Decimal
   user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Tokens {
+  id          String  @id @default(uuid())
+  name        String
+  ticker      String
+  description String?
+  imageUrl    String
+  userId      String  @unique
+  user        User    @relation(fields: [userId], references: [id])
+}
+
+enum ROLE {
+  USER
+  CREATOR
 }
