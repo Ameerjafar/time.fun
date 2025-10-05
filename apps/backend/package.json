@@ -21,6 +21,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/nodemailer": "^7.0.1",
     "@types/otp-generator": "^4.0.2",
+    "bs58": "^6.0.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",

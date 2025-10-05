@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { prisma } from "@repo/db";
+import { clusterApiUrl, Connection } from "@solana/web3.js";
+
 interface QueryObject {
   name: string;
   tokenTicker: string;
@@ -7,8 +9,7 @@ interface QueryObject {
   imageUrl: string;
   userId: string;
 }
-
-export const createToken = async (req: Request, res: Response) => {
+export const createTokenOffChain = async (req: Request, res: Response) => {
   const { name, tokenTicker, description, imageUrl, userId } =
     req.query as unknown as QueryObject;
   try {
@@ -46,3 +47,5 @@ export const createToken = async (req: Request, res: Response) => {
     return res.status(400).json({ error });
   }
 };
+
+
