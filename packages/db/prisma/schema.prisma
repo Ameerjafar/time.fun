@@ -15,8 +15,9 @@ datasource db {
 
 model User {
   id                  String          @id @default(uuid())
-  name                String
+  name                String          @unique
   role                ROLE
+  profession          String
   email               String
   dmPrice             Float?
   GroupChatFixedPrice Float?

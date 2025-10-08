@@ -14,10 +14,7 @@ import {
   LAMPORTS_PER_SOL,
   PublicKey,
 } from "@solana/web3.js";
-import dotenv from "dotenv";
 import bs58 from "bs58";
-
-dotenv.config();
 
 interface BurnTokenParams {
   amountToBurn: number;
@@ -28,7 +25,7 @@ interface BurnTokenParams {
 export const createTokenOnChain = async () => {
   const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
-  const privateKey = bs58.decode(process.env.SOLANA_PRIVATE_KEY!)
+  const privateKey = bs58.decode(process.env.SOLANA_PRIVATE_KEY!);
 
   const payer = Keypair.fromSecretKey(Uint8Array.from(privateKey));
   const balance = await connection.getBalance(payer.publicKey);
@@ -36,6 +33,7 @@ export const createTokenOnChain = async () => {
 
   const mintAuthority = payer.publicKey;
   const freezeAuthority = null;
+  const totalToken = parseInt(process.env.TOKEN_SUPPLY_OF_TOKEN!);
   const decimals = 6;
 
   const tokenMint = await createMint(
@@ -59,8 +57,7 @@ export const createTokenOnChain = async () => {
     TOKEN_2022_PROGRAM_ID
   );
   console.log(`Associated Token Account created: ${tokenAccount.toBase58()}`);
-
-  const amountToMint = 10000 * Math.pow(10, decimals);
+  const amountToMint = 100000 * Math.pow(10, 6);
   await mintTo(
     connection,
     payer,
@@ -144,3 +141,4 @@ export const getTokenAccountDetails = async (ataAddress: string) => {
     console.error("Error fetching token account:", err);
   }
 };
+createTokenOnChain();
