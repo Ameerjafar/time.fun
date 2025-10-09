@@ -1,0 +1,20 @@
+{
+  "name": "chat-ws",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run index.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@cache/db": "*",
+    "@repo/db": "*",
+    "ws": "^8.18.3"
+  }
+}

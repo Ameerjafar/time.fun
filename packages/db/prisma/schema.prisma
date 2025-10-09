@@ -29,6 +29,15 @@ model User {
   createdToken        Tokens?
 }
 
+model Message {
+  id   String      @id @default(uuid())
+  from String
+  to   String
+  date DateTime
+  data String
+  type MessageType
+}
+
 model UserHoldToken {
   id        String   @id @default(uuid())
   tokenId   String
@@ -46,10 +55,15 @@ model Tokens {
   description String?
   imageUrl    String
   userId      String  @unique
-  user        User    @relation(fields: [userId], references: [id])
+  user        User    @relation(fields: [userId], references: [name])
 }
 
 enum ROLE {
   USER
   CREATOR
+}
+
+enum MessageType {
+  P2PMESSAGE
+  GROUPMESSAGE
 }

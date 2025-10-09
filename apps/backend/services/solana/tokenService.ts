@@ -15,7 +15,7 @@ import {
   PublicKey,
 } from "@solana/web3.js";
 import bs58 from "bs58";
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 
 dotenv.config();
 
@@ -36,7 +36,7 @@ export const createTokenOnChain = async () => {
 
   const privateKey = bs58.decode(PRIVATE_KEY);
   const payer = Keypair.fromSecretKey(Uint8Array.from(privateKey));
-  
+
   const balance = await connection.getBalance(payer.publicKey);
   console.log(`Balance: ${balance / LAMPORTS_PER_SOL} SOL`);
 
@@ -64,7 +64,7 @@ export const createTokenOnChain = async () => {
     TOKEN_2022_PROGRAM_ID
   );
   console.log(`Associated Token Account created: ${tokenAccount.toBase58()}`);
-  
+
   const amountToMint = TOKEN_SUPPLY * Math.pow(10, TOKEN_DECIMALS);
   await mintTo(
     connection,
@@ -120,7 +120,7 @@ export const burnToken = async ({
   );
 
   console.log("Burned tokens successfully! Tx signature:", txSig);
-  
+
   return txSig;
 };
 
@@ -147,7 +147,7 @@ export const getTokenAccountDetails = async (ataAddress: string) => {
       "Close Authority:",
       accountInfo.closeAuthority?.toBase58() || "None"
     );
-    
+
     return accountInfo;
   } catch (err) {
     console.error("Error fetching token account:", err);
