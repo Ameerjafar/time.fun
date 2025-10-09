@@ -2,7 +2,11 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import { clusterApiUrl, Connection, Keypair, PublicKey } from "@solana/web3.js";
-import { Raydium, TxVersion } from "@raydium-io/raydium-sdk-v2";
+import {
+  Raydium,
+  TxVersion,
+  DEVNET_PROGRAM_ID,
+} from "@raydium-io/raydium-sdk-v2";
 import bs58 from "bs58";
 import BN from "bn.js";
 import {
@@ -10,10 +14,13 @@ import {
   TOKEN_2022_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
-const privateKey = bs58.decode(process.env.SOLANA_PRIVATE_KEY!);
+const RPC_URL = process.env.RPC_URL || clusterApiUrl("devnet");
+const connection = new Connection(RPC_URL, "confirmed");
+
+const privateKey = bs58.decode(process.env.PRIVATE_KEY!);
 const owner = Keypair.fromSecretKey(Uint8Array.from(privateKey));
+
 const raydium = await Raydium.load({
   connection,
   owner,
@@ -46,9 +53,19 @@ const quoteMint = new PublicKey(process.env.QUOTE_MINT!);
 const baseAmount = new BN(process.env.BASE_AMOUNT!);
 const quoteAmount = new BN(process.env.QUOTE_AMOUNT!);
 
+const baseProgramId =
+  process.env.BASE_PROGRAM_ID === "TOKEN_2022"
+    ? TOKEN_2022_PROGRAM_ID
+    : TOKEN_PROGRAM_ID;
+
+const quoteProgramId =
+  process.env.QUOTE_PROGRAM_ID === "TOKEN_2022"
+    ? TOKEN_2022_PROGRAM_ID
+    : TOKEN_PROGRAM_ID;
+
 export const createCPMMPool = async () => {
-  const mintAInfo = await getTokenInfo(baseMint, TOKEN_PROGRAM_ID);
-  const mintBInfo = await getTokenInfo(quoteMint, TOKEN_2022_PROGRAM_ID);
+  const mintAInfo = await getTokenInfo(baseMint, baseProgramId);
+  const mintBInfo = await getTokenInfo(quoteMint, quoteProgramId);
 
   if (!mintAInfo || !mintBInfo) {
     throw new Error("Failed to fetch token info");
@@ -74,7 +91,7 @@ export const createCPMMPool = async () => {
       feePayer: owner.publicKey,
       useSOLBalance: true,
     },
-    programId: TOKEN_2022_PROGRAM_ID,
+    programId: DEVNET_PROGRAM_ID.CREATE_CPMM_POOL_PROGRAM,
     txVersion: TxVersion.V0,
   });
 
@@ -84,27 +101,5 @@ export const createCPMMPool = async () => {
   console.log("Transaction ID:", txId);
   console.log("Pool ID:", extInfo.address.poolId.toBase58());
 
-  return { txId, poolId: extInfo.address.poolId.toBase58(), poolInfo: extInfo };
+  return { txId, poolId: extInfo.address.poolId, poolInfo: extInfo };
 };
-export const swap = async () => {
-  try {
-    const poolId = new PublicKey(process.env.POOL_ID!);
-
-    // const poolKeys = await raydium.cpmm.getCpmmPoolKeys(poolId);
-
-    // console.log("Pool Keys:", {
-    //   poolId: poolKeys.poolId.toBase58(),
-    //   baseMint: poolKeys.mintA.toBase58(),
-    //   quoteMint: poolKeys.mintB.toBase58(),
-    //   baseVault: poolKeys.tokenA.toBase58(),
-    //   quoteVault: poolKeys.tokenB.toBase58(),
-    //   lpMint: poolKeys.lpMint.toBase58(),
-    //   feeAccount: poolKeys.feeAccount.toBase58(),
-    // });
-  } catch (error) {
-    console.error("Error fetching pool keys:", error);
-  }
-};
-(async () => {
-  await swap();
-})();

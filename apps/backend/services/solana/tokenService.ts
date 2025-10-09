@@ -15,6 +15,9 @@ import {
   PublicKey,
 } from "@solana/web3.js";
 import bs58 from "bs58";
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 interface BurnTokenParams {
   amountToBurn: number;
@@ -22,26 +25,30 @@ interface BurnTokenParams {
   mintAddress: string;
 }
 
+// Load configuration from .env
+const RPC_URL = process.env.RPC_URL || clusterApiUrl("devnet");
+const PRIVATE_KEY = process.env.PRIVATE_KEY!;
+const TOKEN_DECIMALS = parseInt(process.env.TOKEN_DECIMALS || "6");
+const TOKEN_SUPPLY = parseInt(process.env.TOKEN_SUPPLY!);
+
 export const createTokenOnChain = async () => {
-  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+  const connection = new Connection(RPC_URL, "confirmed");
 
-  const privateKey = bs58.decode(process.env.SOLANA_PRIVATE_KEY!);
-
+  const privateKey = bs58.decode(PRIVATE_KEY);
   const payer = Keypair.fromSecretKey(Uint8Array.from(privateKey));
+  
   const balance = await connection.getBalance(payer.publicKey);
   console.log(`Balance: ${balance / LAMPORTS_PER_SOL} SOL`);
 
   const mintAuthority = payer.publicKey;
   const freezeAuthority = null;
-  const totalToken = parseInt(process.env.TOKEN_SUPPLY_OF_TOKEN!);
-  const decimals = 6;
 
   const tokenMint = await createMint(
     connection,
     payer,
     mintAuthority,
     freezeAuthority,
-    decimals,
+    TOKEN_DECIMALS,
     undefined,
     { commitment: "confirmed" },
     TOKEN_2022_PROGRAM_ID
@@ -57,7 +64,8 @@ export const createTokenOnChain = async () => {
     TOKEN_2022_PROGRAM_ID
   );
   console.log(`Associated Token Account created: ${tokenAccount.toBase58()}`);
-  const amountToMint = 100000 * Math.pow(10, 6);
+  
+  const amountToMint = TOKEN_SUPPLY * Math.pow(10, TOKEN_DECIMALS);
   await mintTo(
     connection,
     payer,
@@ -69,7 +77,7 @@ export const createTokenOnChain = async () => {
     { commitment: "confirmed" },
     TOKEN_2022_PROGRAM_ID
   );
-  console.log(`Minted ${amountToMint / Math.pow(10, decimals)} tokens.`);
+  console.log(`Minted ${amountToMint / Math.pow(10, TOKEN_DECIMALS)} tokens.`);
 
   return {
     mint: tokenMint.toBase58(),
@@ -82,8 +90,8 @@ export const burnToken = async ({
   decimals,
   mintAddress,
 }: BurnTokenParams) => {
-  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
-  const privateKey = bs58.decode(process.env.PRIVATE_KEY!);
+  const connection = new Connection(RPC_URL, "confirmed");
+  const privateKey = bs58.decode(PRIVATE_KEY);
 
   const payer = Keypair.fromSecretKey(Uint8Array.from(privateKey));
   const tokenMint = new PublicKey(mintAddress);
@@ -112,10 +120,12 @@ export const burnToken = async ({
   );
 
   console.log("Burned tokens successfully! Tx signature:", txSig);
+  
+  return txSig;
 };
 
 export const getTokenAccountDetails = async (ataAddress: string) => {
-  const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
+  const connection = new Connection(RPC_URL, "confirmed");
 
   const tokenAccountPubkey = new PublicKey(ataAddress);
 
@@ -137,8 +147,10 @@ export const getTokenAccountDetails = async (ataAddress: string) => {
       "Close Authority:",
       accountInfo.closeAuthority?.toBase58() || "None"
     );
+    
+    return accountInfo;
   } catch (err) {
     console.error("Error fetching token account:", err);
+    throw err;
   }
 };
-createTokenOnChain();
