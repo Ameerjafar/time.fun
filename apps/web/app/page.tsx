@@ -1,4 +1,9 @@
 "use client";
+
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+
+
+
 const Home = () => {
 
   const TWITTER_CLIENT_ID = process.env.NEXT_PUBLIC_TWITTER_CLIEND_ID;
@@ -55,6 +60,7 @@ const Home = () => {
   return (
     <div>
       <button onClick={twitterHandler}>Login with Twitter</button>
+      <WalletMultiButton />
     </div>
   );
 };
