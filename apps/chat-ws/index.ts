@@ -4,7 +4,7 @@ import { flushBatchToDB } from "./services/flushDB";
 const redis_url = process.env.REDIS_URL!;
 const redis = new RedisClient(redis_url);
 redis.connect();
-const wss = new WebSocket.Server({ port: 8080 });
+const wss = new WebSocket.Server({ port: 8081 });
 
 const peerToPeerConnection = new Map<string, WebSocket>();
 const groupConnection = new Map<string, WebSocket[]>();
