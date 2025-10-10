@@ -14,12 +14,16 @@ export function Sender() {
   const localStreamRef = useRef<MediaStream | null>(null);
 
   const [room] = useState<string>("room1");
+  const [time, setTime] = useState<number>(0);
   const [status, setStatus] = useState<string>("initializing");
 
   useEffect(() => {
     async function init() {
       setStatus("getting-media");
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
       localStreamRef.current = stream;
       if (localVideoRef.current) localVideoRef.current.srcObject = stream;
 
@@ -39,26 +43,38 @@ export function Sender() {
             if (!remoteVideoRef.current.srcObject) {
               remoteVideoRef.current.srcObject = new MediaStream();
             }
-            const remoteStream = remoteVideoRef.current.srcObject as MediaStream;
+            const remoteStream = remoteVideoRef.current
+              .srcObject as MediaStream;
             ev.track && remoteStream.addTrack(ev.track);
           }
         };
         pc.onicecandidate = (ev) => {
           if (ev.candidate && wsRef.current?.readyState === WebSocket.OPEN) {
-            wsRef.current.send(JSON.stringify({ type: "candidate", candidate: ev.candidate, room }));
+            wsRef.current.send(
+              JSON.stringify({
+                type: "candidate",
+                candidate: ev.candidate,
+                room,
+              })
+            );
           }
         };
-        pc.onconnectionstatechange = () => setStatus(`pc: ${pc.connectionState}`);
+        pc.onconnectionstatechange = () =>
+          setStatus(`pc: ${pc.connectionState}`);
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
-        ws.send(JSON.stringify({ type: "offer", sdp: pc.localDescription, room }));
+        ws.send(
+          JSON.stringify({ type: "offer", sdp: pc.localDescription, room })
+        );
         setStatus("offer-sent");
       };
 
       ws.onmessage = async (ev) => {
         const msg = JSON.parse(ev.data);
         if (msg.type === "answer") {
-          await pcRef.current?.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+          await pcRef.current?.setRemoteDescription(
+            new RTCSessionDescription(msg.sdp)
+          );
           setStatus("remote-desc-set");
         } else if (msg.type === "candidate") {
           try {
@@ -69,7 +85,6 @@ export function Sender() {
         }
       };
     }
-
     init();
     return () => {
       pcRef.current?.close();
@@ -78,17 +93,36 @@ export function Sender() {
     };
   }, [room]);
 
+  useEffect(() => {
+    setInterval(() => {
+      pcRef.current?.close();
+      wsRef.current?.close();
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    }, 1000 * 60)
+  }, [])
+
   return (
     <div style={{ padding: 20 }}>
       <h1>Sender</h1>
       <div style={{ display: "flex", gap: 12 }}>
         <div>
           <div>Local</div>
-          <video ref={localVideoRef} autoPlay playsInline muted style={{ width: 320, height: 240, background: "#000" }} />
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted
+            style={{ width: 320, height: 240, background: "#000" }}
+          />
         </div>
         <div>
           <div>Remote</div>
-          <video ref={remoteVideoRef} autoPlay playsInline style={{ width: 320, height: 240, background: "#000" }} />
+          <video
+            ref={remoteVideoRef}
+            autoPlay
+            playsInline
+            style={{ width: 320, height: 240, background: "#000" }}
+          />
         </div>
       </div>
       <div style={{ marginTop: 12 }}>

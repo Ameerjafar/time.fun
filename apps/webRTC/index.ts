@@ -17,11 +17,13 @@ app.use(express.json());
 
 const server = http.createServer(app);
 const wss = new WSServer({ server });
+
 const rooms = new Map<
   string,
   {
     sender?: WebSocket;
     receiver?: WebSocket;
+    timeout?: NodeJS.Timeout;
   }
 >();
 
@@ -45,6 +47,13 @@ wss.on("connection", (ws: WebSocket) => {
 
         if (!rooms.has(room)) rooms.set(room, {});
         const entry = rooms.get(room)!;
+
+        if (entry.timeout) {
+          clearTimeout(entry.timeout);
+          entry.timeout = undefined;
+          console.log(`[cleanup] Cancelled scheduled deletion for room=${room}`);
+        }
+
         if (role === "sender") {
           entry.sender = ws;
         } else {
@@ -52,6 +61,7 @@ wss.on("connection", (ws: WebSocket) => {
         }
 
         console.log(`[ws] join room=${room} role=${role}`);
+
         safeSend(entry.sender, {
           type: "peer-status",
           peer: !!entry.receiver ? "connected" : "waiting",
@@ -64,9 +74,9 @@ wss.on("connection", (ws: WebSocket) => {
       }
 
       if (!msg.room) return;
-
       const entry = rooms.get(msg.room);
       if (!entry) return;
+
       switch (msg.type) {
         case "offer":
           console.log(`[ws] forward offer room=${msg.room}`);
@@ -79,15 +89,9 @@ wss.on("connection", (ws: WebSocket) => {
         case "candidate":
           console.log(`[ws] forward candidate room=${msg.room}`);
           if (ws === entry.sender)
-            safeSend(entry.receiver, {
-              type: "candidate",
-              candidate: msg.candidate,
-            });
+            safeSend(entry.receiver, { type: "candidate", candidate: msg.candidate });
           else
-            safeSend(entry.sender, {
-              type: "candidate",
-              candidate: msg.candidate,
-            });
+            safeSend(entry.sender, { type: "candidate", candidate: msg.candidate });
           break;
         case "leave":
           console.log(`[ws] leave room=${msg.room}`);
@@ -106,15 +110,21 @@ wss.on("connection", (ws: WebSocket) => {
     if (!joinedRoom) return;
     const entry = rooms.get(joinedRoom);
     if (!entry) return;
-    if (joinedRole === "sender" && entry.sender === ws)
-      entry.sender = undefined;
-    if (joinedRole === "receiver" && entry.receiver === ws)
-      entry.receiver = undefined;
+
+    if (joinedRole === "sender" && entry.sender === ws) entry.sender = undefined;
+    if (joinedRole === "receiver" && entry.receiver === ws) entry.receiver = undefined;
+
     safeSend(entry.sender, { type: "leave" });
     safeSend(entry.receiver, { type: "leave" });
 
-    if (!entry.sender && !entry.receiver) rooms.delete(joinedRoom);
     console.log(`[ws] closed room=${joinedRoom} role=${joinedRole}`);
+    if (!entry.sender && !entry.receiver) {
+      console.log(`[cleanup] Scheduling deletion for room=${joinedRoom} after 2 minutes`);
+      entry.timeout = setTimeout(() => {
+        rooms.delete(joinedRoom!);
+        console.log(`[cleanup] Deleted inactive room=${joinedRoom}`);
+      }, 2 * 60 * 1000);
+    }
   });
 });
 

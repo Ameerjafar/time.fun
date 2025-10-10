@@ -15,14 +15,16 @@ export function Receiver() {
 
   const [room] = useState<string>("room1");
   const [status, setStatus] = useState<string>("initializing");
+  const [timeLeft, setTimeLeft] = useState<number>(60); // 60-second session
 
+  // ✅ WebRTC + WebSocket setup
   useEffect(() => {
     async function init() {
       setStatus("connecting-ws");
       const ws = new WebSocket(SIGNALING_SERVER);
       wsRef.current = ws;
 
-      ws.onopen = async () => {
+      ws.onopen = () => {
         ws.send(JSON.stringify({ type: "join", role: "receiver", room }));
         setStatus("ws-open");
 
@@ -31,7 +33,9 @@ export function Receiver() {
 
         pc.ontrack = (ev) => {
           if (remoteVideoRef.current) {
-            if (!remoteVideoRef.current.srcObject) remoteVideoRef.current.srcObject = new MediaStream();
+            if (!remoteVideoRef.current.srcObject) {
+              remoteVideoRef.current.srcObject = new MediaStream();
+            }
             const remoteStream = remoteVideoRef.current.srcObject as MediaStream;
             ev.track && remoteStream.addTrack(ev.track);
           }
@@ -51,6 +55,7 @@ export function Receiver() {
         const pc = pcRef.current!;
         if (msg.type === "offer") {
           setStatus("offer-received");
+
           const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
           localStreamRef.current = stream;
           if (localVideoRef.current) localVideoRef.current.srcObject = stream;
@@ -73,28 +78,64 @@ export function Receiver() {
 
     init();
 
+    // ✅ Auto-close connection after 1 minute
+    const cleanupInterval = setInterval(() => {
+      pcRef.current?.close();
+      wsRef.current?.close();
+      localStreamRef.current?.getTracks().forEach((t) => t.stop());
+    }, 1000 * 60);
+
     return () => {
+      clearInterval(cleanupInterval);
       pcRef.current?.close();
       wsRef.current?.close();
       localStreamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, [room]);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          pcRef.current?.close();
+          wsRef.current?.close();
+          localStreamRef.current?.getTracks().forEach((t) => t.stop());
+          setStatus("session-ended");
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Receiver</h1>
-      <div style={{ display: "flex", gap: 12 }}>
+    <div className="p-5 relative">
+      <h1 className="text-2xl font-bold mb-4">Receiver</h1>
+
+      <div className="flex gap-3">
         <div>
-          <div>Local</div>
-          <video ref={localVideoRef} autoPlay playsInline muted style={{ width: 320, height: 240, background: "#000" }} />
+          <div className="mb-1 font-semibold">Local</div>
+          <video ref={localVideoRef} autoPlay playsInline muted className="w-80 h-60 bg-black" />
         </div>
         <div>
-          <div>Remote</div>
-          <video ref={remoteVideoRef} autoPlay playsInline style={{ width: 320, height: 240, background: "#000" }} />
+          <div className="mb-1 font-semibold">Remote</div>
+          <video ref={remoteVideoRef} autoPlay playsInline className="w-80 h-60 bg-black" />
         </div>
       </div>
-      <div style={{ marginTop: 12 }}>
+      <div className="mt-3 font-medium">
         <strong>Status:</strong> {status}
+      </div>
+      <div className="absolute top-2 right-2 bg-black bg-opacity-60 text-white px-3 py-1 rounded-lg font-mono text-sm">
+        ⏱ {formatTime(timeLeft)}
       </div>
     </div>
   );
