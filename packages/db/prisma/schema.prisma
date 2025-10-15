@@ -52,6 +52,7 @@ model Tokens {
   id          String  @id @default(uuid())
   name        String
   ticker      String
+  totalSupply Int
   description String?
   imageUrl    String
   userId      String  @unique

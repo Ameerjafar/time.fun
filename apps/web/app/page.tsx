@@ -1,6 +1,6 @@
 "use client";
-
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { Card } from './ui/Card';
+import { WalletDisconnectButton, WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
 
 
@@ -59,8 +59,10 @@ const Home = () => {
 
   return (
     <div>
-      <button onClick={twitterHandler}>Login with Twitter</button>
+      {/* <button onClick={twitterHandler}>Login with Twitter</button>
       <WalletMultiButton />
+      <WalletDisconnectButton /> */}
+      <div className = 'bg-black'><Card price={0.34} name="Ameer Jafar" rating={4.2} description="he is good developer"  imageUrl = "https://picsum.photos/800/600"/></div>
     </div>
   );
 };

@@ -8,9 +8,11 @@ interface QueryObject {
   description: string;
   imageUrl: string;
   userId: string;
+  totalSupply: number
 }
+
 export const createTokenOffChain = async (req: Request, res: Response) => {
-  const { name, tokenTicker, description, imageUrl, userId } =
+  const { name, tokenTicker, description, imageUrl, userId, totalSupply } =
     req.query as unknown as QueryObject;
   try {
     if (!name && !tokenTicker && !imageUrl) {
@@ -35,6 +37,7 @@ export const createTokenOffChain = async (req: Request, res: Response) => {
         ticker: tokenTicker,
         ...(description ? { description } : {}),
         imageUrl,
+        totalSupply
       },
     });
     if (!response) {
@@ -48,4 +51,9 @@ export const createTokenOffChain = async (req: Request, res: Response) => {
   }
 };
 
+
+export const createTokenOnChain = (req: Request, res: Response) => {
+  const { name, ticker, description, imageUrl } = req.body;
+  
+}
 

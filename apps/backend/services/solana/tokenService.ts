@@ -25,13 +25,12 @@ interface BurnTokenParams {
   mintAddress: string;
 }
 
-// Load configuration from .env
 const RPC_URL = process.env.RPC_URL || clusterApiUrl("devnet");
 const PRIVATE_KEY = process.env.PRIVATE_KEY!;
 const TOKEN_DECIMALS = parseInt(process.env.TOKEN_DECIMALS || "6");
 const TOKEN_SUPPLY = parseInt(process.env.TOKEN_SUPPLY!);
 
-export const createTokenOnChain = async () => {
+export const createToken = async () => {
   const connection = new Connection(RPC_URL, "confirmed");
 
   const privateKey = bs58.decode(PRIVATE_KEY);
@@ -65,7 +64,7 @@ export const createTokenOnChain = async () => {
   );
   console.log(`Associated Token Account created: ${tokenAccount.toBase58()}`);
 
-  const amountToMint = TOKEN_SUPPLY * Math.pow(10, TOKEN_DECIMALS);
+  const amountToMint = 10_000_00 * Math.pow(10, TOKEN_DECIMALS);
   await mintTo(
     connection,
     payer,
