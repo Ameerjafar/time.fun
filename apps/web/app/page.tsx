@@ -1,6 +1,6 @@
 "use client";
 import { Card } from './ui/Card';
-import { WalletDisconnectButton, WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+// import { WalletDisconnectButton, WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 
 
 

@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "programs/*"
+    "programs/bonding_curve"
 ]
 resolver = "2"
 
