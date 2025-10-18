@@ -2,7 +2,16 @@
 import { motion } from 'framer-motion';
 import { useState } from 'react';
 import { Twitter, Loader2 } from 'lucide-react';
-export const TwitterLogin = () => {
+
+interface TwitterLoginProps {
+  variant?: 'default' | 'compact' | 'minimal';
+  className?: string;
+}
+
+export const TwitterLogin = ({ 
+  variant = 'default', 
+  className = ''
+}: TwitterLoginProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const TWITTER_CLIENT_ID = process.env.NEXT_PUBLIC_TWITTER_CLIEND_ID!;
   console.log("this is twitter client id", TWITTER_CLIENT_ID);
@@ -28,7 +37,7 @@ export const TwitterLogin = () => {
   async function generateCodeChallenge(codeVerifier: string) {
     const encoder = new TextEncoder();
     const data = encoder.encode(codeVerifier);
-    const digest = await window.crypto.subtle.digest("SHA-256", data.buffer);
+    const digest = await window.crypto.subtle.digest("SHA-256", data.buffer as ArrayBuffer);
     return base64urlencode(digest);
   }
 
@@ -68,12 +77,48 @@ export const TwitterLogin = () => {
     }
   };
 
+  if (variant === 'compact') {
+    return (
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={handleTwitterLogin}
+        className={`flex items-center space-x-2 bg-[#1DA1F2] text-white px-4 py-2 rounded-lg font-medium hover:bg-[#1DA1F2]/90 transition-all duration-200 text-sm ${className}`}
+      >
+        {isLoading ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <Twitter className="w-4 h-4" />
+        )}
+        <span>{isLoading ? 'Connecting...' : 'Twitter'}</span>
+      </motion.button>
+    );
+  }
+
+  if (variant === 'minimal') {
+    return (
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        onClick={handleTwitterLogin}
+        className={`flex items-center space-x-2 bg-transparent text-[#1DA1F2] border border-[#1DA1F2]/30 hover:bg-[#1DA1F2]/10 px-3 py-2 rounded-lg font-medium transition-all duration-200 text-sm ${className}`}
+      >
+        {isLoading ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <Twitter className="w-4 h-4" />
+        )}
+        <span>{isLoading ? 'Connecting...' : 'Twitter'}</span>
+      </motion.button>
+    );
+  }
+
   return (
     <motion.button
       whileHover={{ scale: 1.02 }}
       whileTap={{ scale: 0.98 }}
       onClick={handleTwitterLogin}
-      className="flex items-center space-x-2 bg-[#1DA1F2] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#1DA1F2]/90   transition-all duration-200"
+      className={`flex items-center space-x-2 bg-[#1DA1F2] text-white px-6 py-3 rounded-lg font-medium hover:bg-[#1DA1F2]/90 transition-all duration-200 ${className}`}
     >
       {isLoading ? (
         <Loader2 className="w-5 h-5 animate-spin" />

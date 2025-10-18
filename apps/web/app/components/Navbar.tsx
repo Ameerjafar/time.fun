@@ -1,8 +1,10 @@
 "use client";
 import { motion } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
-import { Menu, X, User, LogOut, Settings, LogIn } from 'lucide-react';
+import { Menu, X, User, LogOut, Settings } from 'lucide-react';
 import { LoginModal } from './LoginModal';
+import { WalletConnectButton } from './WalletConnectButton';
+import { TwitterLogin } from './TwitterLogin';
 import { useAuth } from '../contexts/AuthContext';
 import { useWallet } from '@solana/wallet-adapter-react';
 
@@ -71,7 +73,7 @@ export const Navbar = () => {
           </div>
 
           {/* Desktop CTA Buttons */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-3">
             {user ? (
               <div className="relative" ref={userMenuRef}>
                 <motion.button
@@ -97,11 +99,11 @@ export const Navbar = () => {
                       {user.twitterHandle && (
                         <p className="text-xs text-gray-400">@{user.twitterHandle}</p>
                       )}
-                      {connected && publicKey && (
+                      {/* {connected && publicKey && (
                         <p className="text-xs text-gray-400 font-mono">
                           {publicKey.toString().slice(0, 4)}...{publicKey.toString().slice(-4)}
                         </p>
-                      )}
+                      )} */}
                     </div>
                     <button 
                       onClick={() => window.location.href = '/profile'}
@@ -125,15 +127,10 @@ export const Navbar = () => {
                 )}
               </div>
             ) : (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setIsLoginModalOpen(true)}
-                className="flex items-center space-x-2 bg-secondary text-black px-4 py-2 rounded-lg font-medium"
-              >
-                <LogIn className="w-4 h-4" />
-                <span>Login</span>
-              </motion.button>
+              <>
+                <WalletConnectButton variant="compact" />
+                <TwitterLogin variant="compact" />
+              </>
             )}
           </div>
 
@@ -202,15 +199,10 @@ export const Navbar = () => {
                   </motion.button>
                 </div>
               ) : (
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => setIsLoginModalOpen(true)}
-                  className="w-full flex items-center justify-center space-x-2 bg-secondary text-black px-4 py-2 rounded-lg font-medium"
-                >
-                  <LogIn className="w-4 h-4" />
-                  <span>Login</span>
-                </motion.button>
+                <div className="space-y-2">
+                  <WalletConnectButton variant="default" className="w-full" />
+                  <TwitterLogin variant="default" className="w-full" />
+                </div>
               )}
             </div>
           </div>
