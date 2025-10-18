@@ -1,3 +1,4 @@
+
 [package]
 name = "bonding_curve"
 version = "0.1.0"
@@ -24,9 +25,10 @@ custom-panic = []
 anchor-lang = "0.32.1"
 anchor-spl = { version = "0.32.1", features = ["idl-build"] }
 rust_decimal = "1.39.0"
+proc-macro2 = "1.0.94"
 
-proc-macro2 = "=1.0.94"
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
+
 

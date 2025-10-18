@@ -1,13 +1,12 @@
 use anchor_lang::prelude::*;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
-use rust_decimal::prelude::ToPrimitive;
-use rust_decimal::Decimal;
-declare_id!("Fg6PaFpoGXkYsidMpWxTWq1JLYR3j3x3h5xV7zZzvQvY");
+use anchor_spl::token::{Mint, Token as TokenProgram, TokenAccount};
+
+declare_id!("HWrXGnz3Yu8t4P3UBEnS2Mdzt5YuT1FdvNuds1r5LnMW");
+
 
 #[program]
 pub mod bonding_curve {
     use anchor_spl::token::TransferChecked;
-
     use super::*;
 
     pub fn initialize(
@@ -33,7 +32,7 @@ pub mod bonding_curve {
         };
         let cpi_ctx_x =
             CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts_x);
-        token::transfer_checked(cpi_ctx_x, initial_sol, ctx.accounts.token_x_mint.decimals)?;
+        anchor_spl::token::transfer_checked(cpi_ctx_x, initial_sol, ctx.accounts.token_x_mint.decimals)?;
 
         // Transfer initial token Y from user to pool
         let cpi_accounts_y = TransferChecked {
@@ -44,26 +43,26 @@ pub mod bonding_curve {
         };
         let cpi_ctx_y =
             CpiContext::new(ctx.accounts.token_program.to_account_info(), cpi_accounts_y);
-        token::transfer_checked(cpi_ctx_y, initial_token, ctx.accounts.token_y_mint.decimals)?;
+        anchor_spl::token::transfer_checked(cpi_ctx_y, initial_token, ctx.accounts.token_y_mint.decimals)?;
 
         Ok(())
     }
 
     pub fn buy(ctx: Context<Buy>, amount_out_token: u64) -> Result<()> {
         let state = &mut ctx.accounts.pool;
-        let sol_reserve = Decimal::from(state.reserve_x);
-        let token_reserve = Decimal::from(state.reserve_y);
+        let sol_reserve = state.reserve_x as u128;
+        let token_reserve = state.reserve_y as u128;
         let k = sol_reserve * token_reserve;
         require!(
             amount_out_token <= state.reserve_y,
             CustomError::NotEnoughTokensInPool
         );
 
-        let new_token_reserve = token_reserve - Decimal::from(amount_out_token);
+        let new_token_reserve = token_reserve - amount_out_token as u128;
         let new_sol_reserve = k / new_token_reserve;
         let amount_in_sol = new_sol_reserve - sol_reserve;
 
-        let amount_in_sol_u64 = amount_in_sol.ceil().to_u64().unwrap();
+        let amount_in_sol_u64 = amount_in_sol as u64;
         state.reserve_x += amount_in_sol_u64;
         state.reserve_y -= amount_out_token;
         **ctx
@@ -84,7 +83,7 @@ pub mod bonding_curve {
         };
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        token::transfer(cpi_ctx, amount_out_token)?;
+        anchor_spl::token::transfer(cpi_ctx, amount_out_token)?;
 
         Ok(())
     }
@@ -92,13 +91,13 @@ pub mod bonding_curve {
     pub fn sell(ctx: Context<Sell>, amount_in_token: u64) -> Result<()> {
         let state = &mut ctx.accounts.pool;
 
-        let sol_reserve = Decimal::from(state.reserve_x);
-        let token_reserve = Decimal::from(state.reserve_y);
+        let sol_reserve = state.reserve_x as u128;
+        let token_reserve = state.reserve_y as u128;
         let k = sol_reserve * token_reserve;
-        let new_token_reserve = token_reserve + Decimal::from(amount_in_token);
+        let new_token_reserve = token_reserve + amount_in_token as u128;
         let new_sol_reserve = k / new_token_reserve;
         let amount_out_sol = sol_reserve - new_sol_reserve;
-        let amount_out_sol_u64 = amount_out_sol.floor().to_u64().unwrap();
+        let amount_out_sol_u64 = amount_out_sol as u64;
 
         state.reserve_x -= amount_out_sol_u64;
         state.reserve_y += amount_in_token;
@@ -119,7 +118,7 @@ pub mod bonding_curve {
         };
         let cpi_program = ctx.accounts.token_program.to_account_info();
         let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-        token::transfer(cpi_ctx, amount_in_token)?;
+        anchor_spl::token::transfer(cpi_ctx, amount_in_token)?;
 
         Ok(())
     }
@@ -143,7 +142,7 @@ pub struct Buy<'info> {
     #[account(mut)]
     pub user_token_account: Account<'info, TokenAccount>,
 
-    pub token_program: Program<'info, Token>,
+    pub token_program: Program<'info, TokenProgram>,
     pub system_program: Program<'info, System>,
 }
 
@@ -165,7 +164,7 @@ pub struct Sell<'info> {
     #[account(mut)]
     pub user_token_account: Account<'info, TokenAccount>,
 
-    pub token_program: Program<'info, Token>,
+    pub token_program: Program<'info, TokenProgram>,
     pub system_program: Program<'info, System>,
 }
 
@@ -193,7 +192,7 @@ pub struct InitializePool<'info> {
     #[account(mut)]
     pub pool_token_y_account: Account<'info, TokenAccount>,
 
-    pub token_program: Program<'info, Token>,
+    pub token_program: Program<'info, TokenProgram>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
 }
