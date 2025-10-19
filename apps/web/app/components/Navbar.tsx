@@ -1,7 +1,7 @@
 "use client";
 import { motion } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
-import { Menu, X, User, LogOut, Settings } from 'lucide-react';
+import { Menu, X, User, LogOut, Settings, MessageCircle, Users, Video } from 'lucide-react';
 import { LoginModal } from './LoginModal';
 import { WalletConnectButton } from './WalletConnectButton';
 import { TwitterLogin } from './TwitterLogin';
@@ -112,6 +112,27 @@ export const Navbar = () => {
                       <User className="w-4 h-4" />
                       <span>Profile</span>
                     </button>
+                    <button 
+                      onClick={() => window.location.href = '/chat'}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center space-x-2"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span>Direct Messages</span>
+                    </button>
+                    <button 
+                      onClick={() => window.location.href = '/group-chat'}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center space-x-2"
+                    >
+                      <Users className="w-4 h-4" />
+                      <span>Group Chat</span>
+                    </button>
+                    <button 
+                      onClick={() => window.location.href = '/webrtc'}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center space-x-2"
+                    >
+                      <Video className="w-4 h-4" />
+                      <span>Video Calls</span>
+                    </button>
                     <button className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center space-x-2">
                       <Settings className="w-4 h-4" />
                       <span>Settings</span>
@@ -187,6 +208,33 @@ export const Navbar = () => {
                   >
                     <User className="w-4 h-4" />
                     <span>Profile</span>
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => window.location.href = '/chat'}
+                    className="w-full flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg font-medium"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>Direct Messages</span>
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => window.location.href = '/group-chat'}
+                    className="w-full flex items-center justify-center space-x-2 bg-purple-600 text-white px-4 py-2 rounded-lg font-medium"
+                  >
+                    <Users className="w-4 h-4" />
+                    <span>Group Chat</span>
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => window.location.href = '/webrtc'}
+                    className="w-full flex items-center justify-center space-x-2 bg-indigo-600 text-white px-4 py-2 rounded-lg font-medium"
+                  >
+                    <Video className="w-4 h-4" />
+                    <span>Video Calls</span>
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.02 }}

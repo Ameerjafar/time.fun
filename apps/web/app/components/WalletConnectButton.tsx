@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { CheckCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
 
 interface WalletConnectButtonProps {
   variant?: 'default' | 'compact' | 'minimal';
@@ -16,12 +17,17 @@ export const WalletConnectButton = ({
   showStatus = true 
 }: WalletConnectButtonProps) => {
   const { connected, publicKey } = useWallet();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   if (variant === 'compact') {
     return (
       <div className={`flex items-center space-x-2 ${className}`}>
         <WalletMultiButton className="!bg-secondary/10 !text-secondary !border-secondary/20 hover:!bg-secondary/20 !rounded-lg !font-medium !justify-center !py-2 !px-4 !text-sm" />
-        {showStatus && connected && publicKey && (
+        {isClient && showStatus && connected && publicKey && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -47,7 +53,7 @@ export const WalletConnectButton = ({
     <div className={`space-y-3 ${className}`}>
       <WalletMultiButton className="!w-full !bg-secondary/10 !text-secondary !border-secondary/20 hover:!bg-secondary/20 !rounded-lg !font-medium !justify-center !py-3" />
       
-      {showStatus && connected && publicKey && (
+      {isClient && showStatus && connected && publicKey && (
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}

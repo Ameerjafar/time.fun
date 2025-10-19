@@ -10,9 +10,11 @@ import {
   PhoneOff, 
   Users, 
   Monitor,
-  ArrowLeft
+  ArrowLeft,
+  Copy,
+  Check
 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const SIGNALING_SERVER = "ws://localhost:8080";
 const STUN_CONFIG: RTCConfiguration = {
@@ -22,17 +24,19 @@ const STUN_CONFIG: RTCConfiguration = {
   ],
 };
 
-const VideoSender = () => {
+const WebRTCPage = () => {
   const { user } = useAuth();
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [roomId, setRoomId] = useState('room1');
+  const [roomId, setRoomId] = useState('');
   const [participants, setParticipants] = useState<string[]>([]);
   const [isVideoEnabled, setIsVideoEnabled] = useState(true);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [callDuration, setCallDuration] = useState(0);
+  const [roomCode, setRoomCode] = useState('');
+  const [copied, setCopied] = useState(false);
   const [permissionError, setPermissionError] = useState<string | null>(null);
   const [isHttps, setIsHttps] = useState(true);
 
@@ -46,7 +50,16 @@ const VideoSender = () => {
   const screenStreamRef = useRef<MediaStream | null>(null);
   const callStartTimeRef = useRef<number>(0);
 
-  // Call duration timer and HTTPS check
+  // Generate room code and check HTTPS
+  useEffect(() => {
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    setRoomCode(code);
+    
+    // Check if running on HTTPS
+    setIsHttps(window.location.protocol === 'https:' || window.location.hostname === 'localhost');
+  }, []);
+
+  // Call duration timer
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (isConnected && callStartTimeRef.current > 0) {
@@ -57,11 +70,6 @@ const VideoSender = () => {
     return () => clearInterval(interval);
   }, [isConnected]);
 
-  useEffect(() => {
-    // Check if running on HTTPS
-    setIsHttps(window.location.protocol === 'https:' || window.location.hostname === 'localhost');
-  }, []);
-
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -69,7 +77,19 @@ const VideoSender = () => {
     return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const copyRoomCode = async () => {
+    try {
+      await navigator.clipboard.writeText(roomCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy room code:', err);
+    }
+  };
+
   const startCall = async () => {
+    if (!roomId.trim()) return;
+    
     setIsConnecting(true);
     setConnectionStatus('connecting');
     setPermissionError(null);
@@ -133,6 +153,8 @@ const VideoSender = () => {
           setParticipants(prev => [...prev, message.user]);
         } else if (message.type === "participant-left") {
           setParticipants(prev => prev.filter(p => p !== message.user));
+        } else if (message.type === "offer") {
+          await handleOffer(message);
         } else if (message.type === "answer") {
           await handleAnswer(message);
         } else if (message.type === "candidate") {
@@ -200,6 +222,124 @@ const VideoSender = () => {
     }
   };
 
+  const joinCall = async () => {
+    if (!roomId.trim()) return;
+    
+    setIsConnecting(true);
+    setConnectionStatus('connecting');
+    setPermissionError(null);
+
+    try {
+      // Check HTTPS requirement
+      if (!isHttps) {
+        throw new Error('HTTPS_REQUIRED');
+      }
+
+      // Connect to signaling server first
+      const ws = new WebSocket(SIGNALING_SERVER);
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({ 
+          type: "join", 
+          role: "receiver", 
+          room: roomId,
+          user: user?.name || 'Anonymous'
+        }));
+        setConnectionStatus('connected');
+        setIsConnected(true);
+        callStartTimeRef.current = Date.now();
+        setIsConnecting(false);
+      };
+
+      ws.onmessage = async (event) => {
+        const message = JSON.parse(event.data);
+        
+        if (message.type === "participant-joined") {
+          setParticipants(prev => [...prev, message.user]);
+        } else if (message.type === "participant-left") {
+          setParticipants(prev => prev.filter(p => p !== message.user));
+        } else if (message.type === "offer") {
+          await handleOffer(message);
+        } else if (message.type === "answer") {
+          await handleAnswer(message);
+        } else if (message.type === "candidate") {
+          await handleCandidate(message);
+        }
+      };
+
+    } catch (error: any) {
+      console.error('Error joining call:', error);
+      setConnectionStatus('error');
+      setIsConnecting(false);
+      
+      // Handle specific permission errors
+      if (error.name === 'NotAllowedError' || error.message === 'Permission denied by user') {
+        setPermissionError('Camera and microphone access was denied. Please allow access and try again.');
+      } else if (error.name === 'NotFoundError') {
+        setPermissionError('No camera or microphone found. Please check your devices.');
+      } else if (error.name === 'NotReadableError') {
+        setPermissionError('Camera or microphone is already in use by another application.');
+      } else if (error.message === 'HTTPS_REQUIRED') {
+        setPermissionError('HTTPS is required for camera and microphone access. Please use HTTPS or localhost.');
+      } else {
+        setPermissionError('Failed to access camera and microphone. Please check your permissions.');
+      }
+    }
+  };
+
+  const handleOffer = async (message: { sdp: RTCSessionDescriptionInit }) => {
+    if (!pcRef.current) return;
+
+    try {
+      console.log('Handling offer...');
+      // Get user media
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: isVideoEnabled,
+        audio: isAudioEnabled,
+      });
+      
+      localStreamRef.current = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+        console.log('Local video stream set in handleOffer:', stream);
+      }
+
+      // Add tracks to peer connection
+      stream.getTracks().forEach(track => {
+        pcRef.current!.addTrack(track, stream);
+        console.log('Added track:', track.kind);
+      });
+
+      // Set remote description
+      console.log('Setting remote description...');
+      await pcRef.current.setRemoteDescription(new RTCSessionDescription(message.sdp));
+
+      // Create and send answer
+      console.log('Creating answer...');
+      const answer = await pcRef.current.createAnswer();
+      await pcRef.current.setLocalDescription(answer);
+      
+      console.log('Sending answer...');
+      wsRef.current?.send(JSON.stringify({
+        type: "answer",
+        sdp: pcRef.current.localDescription,
+        room: roomId
+      }));
+    } catch (error: any) {
+      console.error('Error handling offer:', error);
+      
+      // Handle permission errors in offer handling
+      if (error.name === 'NotAllowedError' || error.message === 'Permission denied by user') {
+        setPermissionError('Camera and microphone access was denied. Please allow access and try again.');
+      } else if (error.name === 'NotFoundError') {
+        setPermissionError('No camera or microphone found. Please check your devices.');
+      } else if (error.name === 'NotReadableError') {
+        setPermissionError('Camera or microphone is already in use by another application.');
+      }
+    }
+  };
+
   const handleAnswer = async (message: { sdp: RTCSessionDescriptionInit }) => {
     if (!pcRef.current) return;
     
@@ -221,6 +361,7 @@ const VideoSender = () => {
   };
 
   const endCall = () => {
+    // Close peer connection
     if (pcRef.current) {
       pcRef.current.close();
       pcRef.current = null;
@@ -365,7 +506,7 @@ const VideoSender = () => {
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <h1 className="text-2xl font-bold">Video Call - Sender</h1>
+            <h1 className="text-2xl font-bold">Video Call</h1>
           </div>
           <div className="flex items-center space-x-4">
             {isConnected && (
@@ -398,9 +539,9 @@ const VideoSender = () => {
               animate={{ opacity: 1, y: 0 }}
               className="text-center"
             >
-              <h2 className="text-3xl font-bold mb-4">Start Video Call</h2>
+              <h2 className="text-3xl font-bold mb-4">Start or Join a Video Call</h2>
               <p className="text-gray-400 text-lg">
-                Begin a video call session as the sender
+                Connect with creators and fans through high-quality video calls
               </p>
             </motion.div>
 
@@ -457,49 +598,51 @@ const VideoSender = () => {
               </motion.div>
             )}
 
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-gray-800/50 rounded-2xl p-8 border border-gray-700 max-w-md mx-auto"
-            >
-              <h3 className="text-xl font-bold mb-4 flex items-center space-x-2">
-                <Phone className="w-5 h-5 text-green-400" />
-                <span>Call Settings</span>
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Room ID
-                  </label>
-                  <input
-                    type="text"
-                    value={roomId}
-                    onChange={(e) => setRoomId(e.target.value)}
-                    placeholder="Enter room ID..."
-                    className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:border-green-400"
-                  />
-                </div>
-                <div className="flex space-x-4">
-                  <label className="flex items-center space-x-2 text-sm">
+            <div className="grid md:grid-cols-2 gap-8">
+              {/* Start Call */}
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.2 }}
+                className="bg-gray-800/50 rounded-2xl p-8 border border-gray-700"
+              >
+                <h3 className="text-xl font-bold mb-4 flex items-center space-x-2">
+                  <Phone className="w-5 h-5 text-green-400" />
+                  <span>Start New Call</span>
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Room ID
+                    </label>
                     <input
-                      type="checkbox"
-                      checked={isVideoEnabled}
-                      onChange={(e) => setIsVideoEnabled(e.target.checked)}
-                      className="rounded"
+                      type="text"
+                      value={roomId}
+                      onChange={(e) => setRoomId(e.target.value)}
+                      placeholder="Enter room ID..."
+                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:border-green-400"
                     />
-                    <span>Enable Video</span>
-                  </label>
-                  <label className="flex items-center space-x-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={isAudioEnabled}
-                      onChange={(e) => setIsAudioEnabled(e.target.checked)}
-                      className="rounded"
-                    />
-                    <span>Enable Audio</span>
-                  </label>
-                </div>
+                  </div>
+                  <div className="flex space-x-2">
+                    <label className="flex items-center space-x-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={isVideoEnabled}
+                        onChange={(e) => setIsVideoEnabled(e.target.checked)}
+                        className="rounded"
+                      />
+                      <span>Enable Video</span>
+                    </label>
+                    <label className="flex items-center space-x-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={isAudioEnabled}
+                        onChange={(e) => setIsAudioEnabled(e.target.checked)}
+                        className="rounded"
+                      />
+                      <span>Enable Audio</span>
+                    </label>
+                  </div>
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -509,6 +652,87 @@ const VideoSender = () => {
                   >
                     {isConnecting ? 'Starting...' : !isHttps ? 'HTTPS Required' : 'Start Call'}
                   </motion.button>
+                </div>
+              </motion.div>
+
+              {/* Join Call */}
+              <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-gray-800/50 rounded-2xl p-8 border border-gray-700"
+              >
+                <h3 className="text-xl font-bold mb-4 flex items-center space-x-2">
+                  <Users className="w-5 h-5 text-blue-400" />
+                  <span>Join Existing Call</span>
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Room ID
+                    </label>
+                    <input
+                      type="text"
+                      value={roomId}
+                      onChange={(e) => setRoomId(e.target.value)}
+                      placeholder="Enter room ID..."
+                      className="w-full bg-gray-700 text-white px-4 py-3 rounded-lg border border-gray-600 focus:outline-none focus:border-blue-400"
+                    />
+                  </div>
+                  <div className="flex space-x-2">
+                    <label className="flex items-center space-x-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={isVideoEnabled}
+                        onChange={(e) => setIsVideoEnabled(e.target.checked)}
+                        className="rounded"
+                      />
+                      <span>Enable Video</span>
+                    </label>
+                    <label className="flex items-center space-x-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={isAudioEnabled}
+                        onChange={(e) => setIsAudioEnabled(e.target.checked)}
+                        className="rounded"
+                      />
+                      <span>Enable Audio</span>
+                    </label>
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={joinCall}
+                    disabled={!roomId.trim() || isConnecting || !isHttps}
+                    className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isConnecting ? 'Joining...' : !isHttps ? 'HTTPS Required' : 'Join Call'}
+                  </motion.button>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* Room Code */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="bg-gray-800/30 rounded-xl p-6 border border-gray-700"
+            >
+              <h3 className="text-lg font-semibold mb-3">Share Room Code</h3>
+              <div className="flex items-center space-x-3">
+                <div className="bg-gray-700 px-4 py-2 rounded-lg font-mono text-lg font-bold">
+                  {roomCode}
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={copyRoomCode}
+                  className="flex items-center space-x-2 bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-lg transition-colors"
+                >
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <span>{copied ? 'Copied!' : 'Copy'}</span>
+                </motion.button>
               </div>
             </motion.div>
           </div>
@@ -643,4 +867,4 @@ const VideoSender = () => {
   );
 };
 
-export default VideoSender;
+export default WebRTCPage;

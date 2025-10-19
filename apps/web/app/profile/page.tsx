@@ -42,12 +42,12 @@ export default function ProfilePage() {
   const [copied, setCopied] = useState(false);
 
   // Redirect if not authenticated
-  useEffect(() => {
-    if (!user) {
-      console.log("this is user not found");
-      router.push('/');
-    }
-  }, [user, router]);
+  // useEffect(() => {
+  //   if (!user) {
+  //     console.log("this is user not found");
+  //     router.push('/');
+  //   }
+  // }, [user, router]);
 
   // Update edited user when user changes
   useEffect(() => {
