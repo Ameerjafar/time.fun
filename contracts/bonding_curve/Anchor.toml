@@ -1,5 +1,4 @@
 [toolchain]
-package_manager = "yarn"
 anchor_version = "0.32.1"
 
 [features]
@@ -7,15 +6,14 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
-bonding_curve = "HWrXGnz3Yu8t4P3UBEnS2Mdzt5YuT1FdvNuds1r5LnMW"
+bonding_curve = "2q9eMEr4VWM3nwfZ8hvVY1rCGhPypy36xFPLQq1otRmD"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
-wallet = '~\.config\solana\id.json'
-
+cluster = "Localnet"
+wallet = '~\.config/solana/id.json'
 
 [scripts]
-test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 \"tests/**/*.ts\""
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
