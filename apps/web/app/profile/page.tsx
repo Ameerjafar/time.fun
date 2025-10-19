@@ -1,9 +1,11 @@
 "use client";
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useRouter } from 'next/navigation';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import axios from 'axios';
 import { 
   User, 
   Wallet, 
@@ -19,7 +21,15 @@ import {
   DollarSign,
   Star,
   MessageCircle,
-  Clock
+  Clock,
+  BadgeCheck,
+  Coins,
+  Users,
+  Video,
+  TrendingUp,
+  Shield,
+  Mail,
+  Briefcase
 } from 'lucide-react';
 
 export default function ProfilePage() {
@@ -27,6 +37,8 @@ export default function ProfilePage() {
   const { connected, publicKey, disconnect } = useWallet();
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
+  const [showTokenForm, setShowTokenForm] = useState(false);
+  const [twitterProfile, setTwitterProfile] = useState<any>(null);
   const [editedUser, setEditedUser] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -38,8 +50,22 @@ export default function ProfilePage() {
     skills: [] as string[],
     experience: 0
   });
+  const [tokenData, setTokenData] = useState({
+    name: '',
+    symbol: '',
+    description: '',
+    image: '',
+    pricingModel: 'market' as 'market' | 'fixed',
+    fixedPrice: '',
+    features: {
+      chat: false,
+      groupChat: false,
+      videoCall: false,
+    },
+  });
   const [newSkill, setNewSkill] = useState('');
   const [copied, setCopied] = useState(false);
+  const [isCreator, setIsCreator] = useState(false);
 
   // Redirect if not authenticated
   // useEffect(() => {
@@ -49,9 +75,50 @@ export default function ProfilePage() {
   //   }
   // }, [user, router]);
 
+  // Fetch Twitter profile if user has Twitter connected
+  useEffect(() => {
+    const fetchTwitterProfile = async () => {
+      if (user?.twitterHandle) {
+        try {
+          // Simulated Twitter profile data - in production, fetch from Twitter API
+          const twitterData = {
+            name: user.name,
+            username: user.twitterHandle,
+            avatar: user.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&size=200&background=00FF88&color=000`,
+            bio: 'Web3 enthusiast | Building the future | Creator on Time.fun',
+            followers: 0,
+            following: 0,
+            verified: user.isTwitterConnected || false
+          };
+          setTwitterProfile(twitterData);
+          
+          // Set the bio as the user's description
+          setEditedUser(prev => ({
+            ...prev,
+            bio: twitterData.bio
+          }));
+        } catch (error) {
+          console.error('Error fetching Twitter profile:', error);
+        }
+      } else {
+        // Set default avatar if no Twitter
+        setTwitterProfile({
+          name: user?.name || '',
+          username: '',
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(user?.name || 'User')}&size=200&background=00FF88&color=000`,
+          bio: '',
+          followers: 0,
+          following: 0,
+          verified: false
+        });
+      }
+    };
+    fetchTwitterProfile();
+  }, [user]);
+
   // Update edited user when user changes
   useEffect(() => {
-    if (user) {
+    if (user && !twitterProfile) {
       setEditedUser({
         name: user.name || '',
         email: user.email || '',
@@ -63,8 +130,11 @@ export default function ProfilePage() {
         skills: [],
         experience: 0
       });
+      // Check if user is a creator (has a token)
+      // In production, fetch from backend
+      setIsCreator(false);
     }
-  }, [user]);
+  }, [user, twitterProfile]);
 
   const handleSave = () => {
     login({
@@ -114,6 +184,38 @@ export default function ProfilePage() {
     }
   };
 
+  const handleFeatureToggle = (feature: keyof typeof tokenData.features) => {
+    setTokenData(prev => ({
+      ...prev,
+      features: { ...prev.features, [feature]: !prev.features[feature] },
+    }));
+  };
+
+  const handleTokenSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!tokenData.name || !tokenData.symbol) {
+      alert('Please fill in token name and symbol');
+      return;
+    }
+
+    if (!Object.values(tokenData.features).some(v => v)) {
+      alert('Please select at least one communication feature');
+      return;
+    }
+
+    try {
+      // In production, call backend API to create token
+      console.log('Creating token:', tokenData);
+      alert(`Token ${tokenData.name} (${tokenData.symbol}) created successfully!`);
+      setShowTokenForm(false);
+      setIsCreator(true);
+    } catch (error) {
+      console.error('Error creating token:', error);
+      alert('Failed to create token');
+    }
+  };
+
   if (!user) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -126,44 +228,109 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-gray-900 to-gray-800 border-b border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-20 h-20 bg-gradient-to-br from-secondary to-green-400 rounded-full flex items-center justify-center">
-                <User className="w-10 h-10 text-black" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-white">{user.name}</h1>
+    <div className="min-h-screen bg-black text-white pb-20">
+      {/* Hero Header with Twitter Profile */}
+      <div className="relative bg-gradient-to-br from-gray-900 via-gray-800 to-black border-b border-gray-700">
+        {/* Background Pattern */}
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute inset-0" style={{
+            backgroundImage: 'radial-gradient(circle at 2px 2px, #00FF88 1px, transparent 0)',
+            backgroundSize: '40px 40px'
+          }} />
+        </div>
+
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            {/* Profile Info */}
+            <div className="flex items-start space-x-6">
+              {/* Avatar */}
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                className="relative"
+              >
+                <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-secondary shadow-2xl">
+                  {twitterProfile?.avatar ? (
+                    <img src={twitterProfile.avatar} alt={user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-secondary to-green-400 flex items-center justify-center">
+                      <User className="w-16 h-16 text-black" />
+                    </div>
+                  )}
+                </div>
+                {twitterProfile?.verified && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute -bottom-2 -right-2 bg-blue-500 rounded-full p-2 border-4 border-black"
+                  >
+                    <BadgeCheck className="w-6 h-6 text-white" />
+                  </motion.div>
+                )}
+              </motion.div>
+
+              {/* User Details */}
+              <div className="flex-1">
+                <div className="flex items-center space-x-3 mb-2">
+                  <h1 className="text-4xl font-bold text-white">{user.name}</h1>
+                  {isCreator && (
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="bg-secondary/20 text-secondary px-3 py-1 rounded-full text-sm font-bold flex items-center space-x-1"
+                    >
+                      <Coins className="w-4 h-4" />
+                      <span>Creator</span>
+                    </motion.div>
+                  )}
+                </div>
+                
                 {user.twitterHandle && (
-                  <p className="text-gray-400 flex items-center space-x-1">
-                    <Twitter className="w-4 h-4" />
-                    <span>@{user.twitterHandle}</span>
-                  </p>
+                  <a
+                    href={`https://twitter.com/${user.twitterHandle}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-400 hover:text-secondary flex items-center space-x-2 mb-3 transition-colors"
+                  >
+                    <Twitter className="w-5 h-5" />
+                    <span className="text-lg">@{user.twitterHandle}</span>
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+
+                {user.email && (
+                  <div className="flex items-center space-x-2 text-gray-400 mb-2">
+                    <Mail className="w-4 h-4" />
+                    <span>{user.email}</span>
+                  </div>
+                )}
+
+                {twitterProfile?.bio && (
+                  <p className="text-gray-300 max-w-2xl">{twitterProfile.bio}</p>
                 )}
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+
+            {/* Action Buttons */}
+            <div className="flex flex-col space-y-3">
               {isEditing ? (
                 <>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleSave}
-                    className="flex items-center space-x-2 bg-secondary text-black px-4 py-2 rounded-lg font-medium"
+                    className="flex items-center justify-center space-x-2 bg-secondary text-black px-6 py-3 rounded-lg font-bold shadow-lg"
                   >
-                    <Save className="w-4 h-4" />
-                    <span>Save</span>
+                    <Save className="w-5 h-5" />
+                    <span>Save Changes</span>
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleCancel}
-                    className="flex items-center space-x-2 bg-gray-600 text-white px-4 py-2 rounded-lg font-medium"
+                    className="flex items-center justify-center space-x-2 bg-gray-700 text-white px-6 py-3 rounded-lg font-bold"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-5 h-5" />
                     <span>Cancel</span>
                   </motion.button>
                 </>
@@ -172,16 +339,212 @@ export default function ProfilePage() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setIsEditing(true)}
-                  className="flex items-center space-x-2 bg-gray-700 text-white px-4 py-2 rounded-lg font-medium"
+                  className="flex items-center justify-center space-x-2 bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-bold border border-gray-600"
                 >
-                  <Edit3 className="w-4 h-4" />
+                  <Edit3 className="w-5 h-5" />
                   <span>Edit Profile</span>
+                </motion.button>
+              )}
+              
+              {!isCreator && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setShowTokenForm(!showTokenForm)}
+                  className="flex items-center justify-center space-x-2 bg-gradient-to-r from-secondary to-green-400 text-black px-6 py-3 rounded-lg font-bold shadow-lg"
+                >
+                  <Coins className="w-5 h-5" />
+                  <span>Create Token</span>
                 </motion.button>
               )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Token Creation Form Modal */}
+      <AnimatePresence>
+        {showTokenForm && !isCreator && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowTokenForm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-gray-900 rounded-2xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-secondary/30 shadow-2xl"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-3xl font-bold text-white flex items-center space-x-3">
+                  <Coins className="w-8 h-8 text-secondary" />
+                  <span>Create Your Token</span>
+                </h2>
+                <button
+                  onClick={() => setShowTokenForm(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <form onSubmit={handleTokenSubmit} className="space-y-6">
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-white font-medium mb-2">Token Name</label>
+                    <input
+                      type="text"
+                      placeholder="My Awesome Token"
+                      value={tokenData.name}
+                      onChange={e => setTokenData(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-secondary transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-white font-medium mb-2">Token Symbol</label>
+                    <input
+                      type="text"
+                      placeholder="MAT"
+                      value={tokenData.symbol}
+                      onChange={e => setTokenData(prev => ({ ...prev, symbol: e.target.value.toUpperCase() }))}
+                      maxLength={6}
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-secondary transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-white font-medium mb-2">Description</label>
+                  <textarea
+                    placeholder="Tell your community what makes your token special..."
+                    value={tokenData.description}
+                    onChange={e => setTokenData(prev => ({ ...prev, description: e.target.value }))}
+                    rows={3}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-secondary transition-colors resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-white font-medium mb-2">Token Image URL</label>
+                  <input
+                    type="text"
+                    placeholder="https://..."
+                    value={tokenData.image}
+                    onChange={e => setTokenData(prev => ({ ...prev, image: e.target.value }))}
+                    className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-secondary transition-colors"
+                  />
+                </div>
+
+                {/* Pricing Model */}
+                <div>
+                  <label className="block text-white font-medium mb-3">Pricing Model</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setTokenData(prev => ({ ...prev, pricingModel: 'market' }))}
+                      className={`p-4 rounded-lg border-2 transition-all flex flex-col items-center ${
+                        tokenData.pricingModel === 'market'
+                          ? 'border-secondary bg-secondary/10'
+                          : 'border-gray-700 hover:border-secondary/50'
+                      }`}
+                    >
+                      <TrendingUp className="w-6 h-6 mb-2 text-secondary" />
+                      <span className="font-semibold text-white">Market Price</span>
+                      <span className="text-xs text-gray-400 mt-1">Dynamic pricing</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTokenData(prev => ({ ...prev, pricingModel: 'fixed' }))}
+                      className={`p-4 rounded-lg border-2 transition-all flex flex-col items-center ${
+                        tokenData.pricingModel === 'fixed'
+                          ? 'border-secondary bg-secondary/10'
+                          : 'border-gray-700 hover:border-secondary/50'
+                      }`}
+                    >
+                      <DollarSign className="w-6 h-6 mb-2 text-secondary" />
+                      <span className="font-semibold text-white">Fixed Price</span>
+                      <span className="text-xs text-gray-400 mt-1">Set your price</span>
+                    </button>
+                  </div>
+                </div>
+
+                {tokenData.pricingModel === 'fixed' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                  >
+                    <label className="block text-white font-medium mb-2">Fixed Price (SOL)</label>
+                    <input
+                      type="number"
+                      step="0.001"
+                      placeholder="0.1"
+                      value={tokenData.fixedPrice}
+                      onChange={e => setTokenData(prev => ({ ...prev, fixedPrice: e.target.value }))}
+                      className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-secondary transition-colors"
+                    />
+                  </motion.div>
+                )}
+
+                {/* Communication Features */}
+                <div>
+                  <label className="block text-white font-medium mb-3">Communication Features</label>
+                  <div className="grid grid-cols-3 gap-4">
+                    <button
+                      type="button"
+                      onClick={() => handleFeatureToggle('chat')}
+                      className={`p-4 rounded-lg border-2 transition-all flex flex-col items-center ${
+                        tokenData.features.chat
+                          ? 'border-secondary bg-secondary/10'
+                          : 'border-gray-700 hover:border-secondary/50'
+                      }`}
+                    >
+                      <MessageCircle className={`w-6 h-6 mb-2 ${tokenData.features.chat ? 'text-secondary' : 'text-gray-400'}`} />
+                      <span className="text-sm font-semibold text-white">Chat</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFeatureToggle('groupChat')}
+                      className={`p-4 rounded-lg border-2 transition-all flex flex-col items-center ${
+                        tokenData.features.groupChat
+                          ? 'border-secondary bg-secondary/10'
+                          : 'border-gray-700 hover:border-secondary/50'
+                      }`}
+                    >
+                      <Users className={`w-6 h-6 mb-2 ${tokenData.features.groupChat ? 'text-secondary' : 'text-gray-400'}`} />
+                      <span className="text-sm font-semibold text-white">Group</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFeatureToggle('videoCall')}
+                      className={`p-4 rounded-lg border-2 transition-all flex flex-col items-center ${
+                        tokenData.features.videoCall
+                          ? 'border-secondary bg-secondary/10'
+                          : 'border-gray-700 hover:border-secondary/50'
+                      }`}
+                    >
+                      <Video className={`w-6 h-6 mb-2 ${tokenData.features.videoCall ? 'text-secondary' : 'text-gray-400'}`} />
+                      <span className="text-sm font-semibold text-white">Video</span>
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-secondary to-green-400 text-black font-bold py-4 text-lg rounded-lg hover:shadow-2xl transition-all"
+                >
+                  Create Token
+                </button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -257,17 +620,17 @@ export default function ProfilePage() {
               </div>
               
               <div className="mt-4">
-                <label className="block text-sm font-medium text-gray-300 mb-2">Bio</label>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Bio / Description</label>
                 {isEditing ? (
                   <textarea
                     value={editedUser.bio}
                     onChange={(e) => setEditedUser({ ...editedUser, bio: e.target.value })}
-                    rows={3}
+                    rows={4}
                     className="w-full bg-gray-700 border border-gray-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-secondary"
-                    placeholder="Tell us about yourself..."
+                    placeholder="Tell us about yourself... (This will be synced from your Twitter bio if connected)"
                   />
                 ) : (
-                  <p className="text-white">{editedUser.bio || 'No bio provided'}</p>
+                  <p className="text-white whitespace-pre-wrap">{editedUser.bio || twitterProfile?.bio || 'No bio provided'}</p>
                 )}
               </div>
             </motion.div>
@@ -457,14 +820,9 @@ export default function ProfilePage() {
                 <div className="text-center">
                   <Wallet className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-400 mb-4">No wallet connected</p>
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => window.location.href = '/'}
-                    className="bg-secondary text-black px-4 py-2 rounded-lg font-medium"
-                  >
-                    Connect Wallet
-                  </motion.button>
+                  <div className="flex justify-center">
+                    <WalletMultiButton className="!bg-secondary !text-black !px-6 !py-3 !rounded-lg !font-bold hover:!bg-secondary/90 !transition-all" />
+                  </div>
                 </div>
               )}
             </motion.div>

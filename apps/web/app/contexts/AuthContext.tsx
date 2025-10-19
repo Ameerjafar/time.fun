@@ -8,6 +8,7 @@ interface User {
   twitterHandle?: string;
   avatar?: string;
   isAuthenticated: boolean;
+  isTwitterConnected?: boolean;
 }
 
 interface AuthContextType {
@@ -52,6 +53,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       twitterHandle: userData.twitterHandle,
       avatar: userData.avatar,
       isAuthenticated: true,
+      isTwitterConnected: userData.isTwitterConnected || !!userData.twitterHandle,
     };
     setUser(newUser);
     localStorage.setItem('timefun_user', JSON.stringify(newUser));

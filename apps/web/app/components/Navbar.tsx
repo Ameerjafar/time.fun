@@ -1,12 +1,15 @@
 "use client";
 import { motion } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
-import { Menu, X, User, LogOut, Settings, MessageCircle, Users, Video } from 'lucide-react';
+import { Menu, X, User, LogOut, Settings, MessageCircle, Users, Video, Twitter } from 'lucide-react';
 import { LoginModal } from './LoginModal';
 import { WalletConnectButton } from './WalletConnectButton';
 import { TwitterLogin } from './TwitterLogin';
 import { useAuth } from '../contexts/AuthContext';
 import { useWallet } from '@solana/wallet-adapter-react';
+
+import axios from 'axios';
+import { useRouter } from 'next/navigation';
 
 export const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -15,7 +18,69 @@ export const Navbar = () => {
   const { user, logout } = useAuth();
   const { connected, publicKey } = useWallet();
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const navigator = useRouter();
+  const sumbitHandler = async () => {
+    navigator.push('/auth/signin');
+  }
 
+  const handleTwitterConnect = async () => {
+    const TWITTER_CLIENT_ID = process.env.NEXT_PUBLIC_TWITTER_CLIEND_ID!;
+    
+    if (!TWITTER_CLIENT_ID) {
+      console.error('Twitter Client ID not found');
+      alert('Twitter OAuth is not configured. Please contact the administrator.');
+      return;
+    }
+
+    try {
+      const rootUrl = "https://twitter.com/i/oauth2/authorize";
+      
+      // Generate code verifier and challenge
+      const generateCodeVerifier = (length = 128) => {
+        const characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+        let result = "";
+        for (let i = 0; i < length; i++) {
+          result += characters.charAt(Math.floor(Math.random() * characters.length));
+        }
+        return result;
+      };
+
+      const base64urlencode = (buffer: ArrayBuffer) => {
+        return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+          .replace(/\+/g, "-")
+          .replace(/\//g, "_")
+          .replace(/=+$/, "");
+      };
+
+      const generateCodeChallenge = async (codeVerifier: string) => {
+        const encoder = new TextEncoder();
+        const data = encoder.encode(codeVerifier);
+        const digest = await window.crypto.subtle.digest("SHA-256", data.buffer as ArrayBuffer);
+        return base64urlencode(digest);
+      };
+
+      const codeVerifier = generateCodeVerifier();
+      const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+      sessionStorage.setItem("code_verifier", codeVerifier);
+
+      const params = {
+        redirect_uri: `${window.location.origin}/oauth/twitter`,
+        client_id: TWITTER_CLIENT_ID,
+        state: "state",
+        response_type: "code",
+        code_challenge: codeChallenge,
+        code_challenge_method: "S256",
+        scope: ["users.read", "tweet.read", "follows.read", "follows.write"].join(" "),
+      };
+
+      const qs = new URLSearchParams(params).toString();
+      window.location.href = `${rootUrl}?${qs}`;
+    } catch (error) {
+      console.error('Error initiating Twitter connection:', error);
+      alert('Failed to connect to Twitter. Please try again.');
+    }
+  }
   // Close user menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -112,6 +177,15 @@ export const Navbar = () => {
                       <User className="w-4 h-4" />
                       <span>Profile</span>
                     </button>
+                    {!user.isTwitterConnected && (
+                      <button 
+                        onClick={handleTwitterConnect}
+                        className="w-full text-left px-4 py-2 text-sm text-[#1DA1F2] hover:bg-gray-700 flex items-center space-x-2"
+                      >
+                        <Twitter className="w-4 h-4" />
+                        <span>Connect to Twitter</span>
+                      </button>
+                    )}
                     <button 
                       onClick={() => window.location.href = '/chat'}
                       className="w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700 flex items-center space-x-2"
@@ -150,7 +224,7 @@ export const Navbar = () => {
             ) : (
               <>
                 <WalletConnectButton variant="compact" />
-                <TwitterLogin variant="compact" />
+                <button onClick = { sumbitHandler }>Login</button>
               </>
             )}
           </div>
@@ -209,6 +283,17 @@ export const Navbar = () => {
                     <User className="w-4 h-4" />
                     <span>Profile</span>
                   </motion.button>
+                  {!user.isTwitterConnected && (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleTwitterConnect}
+                      className="w-full flex items-center justify-center space-x-2 bg-[#1DA1F2] text-white px-4 py-2 rounded-lg font-medium"
+                    >
+                      <Twitter className="w-4 h-4" />
+                      <span>Connect to Twitter</span>
+                    </motion.button>
+                  )}
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}

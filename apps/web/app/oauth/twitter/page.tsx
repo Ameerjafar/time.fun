@@ -37,16 +37,20 @@ const TwitterHandler = () => {
                     { codeVerifier }
                 );
 
-                if (response.data.message) {
-                    setUserName(response.data.message);
+                if (response.data.user) {
+                    const userData = response.data.user;
+                    setUserName(userData.name || response.data.twitterName);
                     setStatus('success');
                     setMessage('Successfully logged in with Twitter!');
                     
-                    // Login the user
+                    // Login the user with full data
                     login({
-                        name: response.data.message,
-                        twitterHandle: response.data.message,
-                        isAuthenticated: true,
+                        id: userData.id,
+                        name: userData.name,
+                        email: userData.email,
+                        twitterHandle: userData.twitterHandle || response.data.twitterHandle,
+                        avatar: userData.profilePicture,
+                        isTwitterConnected: true,
                     });
 
                     // Clear the code verifier
@@ -63,7 +67,11 @@ const TwitterHandler = () => {
             } catch (error: any) {
                 console.error('Twitter callback error:', error);
                 setStatus('error');
-                setMessage(error.response?.data?.message || 'An error occurred during login');
+                const errorMsg = error.response?.data?.error || 
+                                error.response?.data?.message || 
+                                error.message || 
+                                'An error occurred during login';
+                setMessage(errorMsg);
             }
         };
 

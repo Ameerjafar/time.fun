@@ -1,4 +1,4 @@
-import { Card } from "../ui/TokenCard";
+import { Card } from "../../ui/TokenCard";
 import { MessageSquare, Users, Video, TrendingUp, DollarSign } from "lucide-react";
 
 interface TokenPreviewProps {
@@ -57,7 +57,7 @@ const TokenPreview = ({ tokenData }: TokenPreviewProps) => {
                 <>
                   <DollarSign className="w-4 h-4 text-secondary" />
                   <span className="text-sm font-semibold text-foreground">
-                    {tokenData.fixedPrice || "0.00"} ETH
+                    {tokenData.fixedPrice || "0.00"} SOL
                   </span>
                 </>
               )}

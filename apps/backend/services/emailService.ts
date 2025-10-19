@@ -2,11 +2,12 @@ import nodemailer from "nodemailer";
 import otpGenerator from "otp-generator";
 import { redis } from '../cache/redis';
 export const emailService = async (email: string) => {
-  const numericOtp = otpGenerator.generate(6, {
+  const numericOtp = otpGenerator.generate(4, {
     upperCaseAlphabets: false,
     specialChars: false,
     lowerCaseAlphabets: false,
   });
+  console.log("otp", numericOtp);
   const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 587,

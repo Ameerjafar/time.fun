@@ -1,5 +1,6 @@
 import { prisma } from "@repo/db";
 import { Request, Response } from "express";
+
 export const getUser = async (req: Request, res: Response) => {
   const { userId } = req.query;
   try {

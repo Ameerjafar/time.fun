@@ -14,19 +14,21 @@ datasource db {
 }
 
 model User {
-  id                  String          @id @default(uuid())
-  name                String          @unique
-  role                ROLE
-  profession          String
-  email               String
-  dmPrice             Float?
-  GroupChatFixedPrice Float?
-  videoCallFixedPrice Float?
-  profilePicture      String?
-  createdAt           DateTime        @default(now())
-  lastLoggedAt        DateTime
-  userHoldTokens      UserHoldToken[]
-  createdToken        Tokens?
+  id             String          @id @default(uuid())
+  name           String          @unique
+  role           ROLE
+  profession     String?
+  email          String?         @unique
+  password       String?
+  profilePicture String?
+  verified       Boolean         @default(false)
+  twitterId      String?         @unique
+  twitterHandle  String?
+  createdAt      DateTime        @default(now())
+  lastLoggedAt   DateTime
+  userHoldTokens UserHoldToken[]
+  createdToken   Token?
+  pricingModel   PricingModel?
 }
 
 model Message {
@@ -48,15 +50,26 @@ model UserHoldToken {
   updatedAt DateTime @updatedAt
 }
 
-model Tokens {
+model Token {
   id          String  @id @default(uuid())
   name        String
-  ticker      String
+  symbol      String
   totalSupply Int
   description String?
   imageUrl    String
   userId      String  @unique
-  user        User    @relation(fields: [userId], references: [name])
+  user        User    @relation(fields: [userId], references: [id])
+}
+
+model PricingModel {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id])
+  fixedDmPrice        Float?
+  fixedGroupChatPrice Float?
+  fixedVideoCallPrice Float?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 enum ROLE {

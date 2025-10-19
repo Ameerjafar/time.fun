@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Star, Clock, Users, Heart } from "lucide-react";
 import Image from "next/image";
 import { useState } from 'react';
-import { BookingModal } from '../components/BookingModal';
+import { BookingModal } from '../app/components/BookingModal';
 
 interface CardType {
   id: number;

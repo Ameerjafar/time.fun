@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion';
 import { useInView } from 'framer-motion';
 import { useRef } from 'react';
-import { Card } from '../ui/Card';
+import { Card } from '../../ui/Card';
 import { Star, Users, ArrowRight } from 'lucide-react';
 
 interface Creator {
