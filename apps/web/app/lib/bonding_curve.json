@@ -1,0 +1,300 @@
+{
+  "address": "EJGrTzirrsJ2ukMdomaXrR31GcHpFckqqir6dqyZEx5S",
+  "metadata": {
+    "name": "bonding_curve",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "buy",
+      "discriminator": [
+        102,
+        6,
+        61,
+        18,
+        1,
+        218,
+        235,
+        234
+      ],
+      "accounts": [
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_x_mint",
+                "account": "PoolState"
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_y_mint",
+                "account": "PoolState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_sol_account",
+          "writable": true
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_out_token",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "token_x_mint",
+          "writable": true
+        },
+        {
+          "name": "token_y_mint",
+          "writable": true
+        },
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "token_x_mint"
+              },
+              {
+                "kind": "account",
+                "path": "token_y_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_token_x_account",
+          "writable": true
+        },
+        {
+          "name": "user_token_y_account",
+          "writable": true
+        },
+        {
+          "name": "pool_token_x_account",
+          "writable": true
+        },
+        {
+          "name": "pool_token_y_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        },
+        {
+          "name": "rent",
+          "address": "SysvarRent111111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "initial_sol",
+          "type": "u64"
+        },
+        {
+          "name": "initial_token",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "sell",
+      "discriminator": [
+        51,
+        230,
+        133,
+        164,
+        1,
+        127,
+        131,
+        173
+      ],
+      "accounts": [
+        {
+          "name": "pool",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  111,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_x_mint",
+                "account": "PoolState"
+              },
+              {
+                "kind": "account",
+                "path": "pool.token_y_mint",
+                "account": "PoolState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "pool_sol_account",
+          "writable": true
+        },
+        {
+          "name": "pool_token_account",
+          "writable": true
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount_in_token",
+          "type": "u64"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "PoolState",
+      "discriminator": [
+        247,
+        237,
+        227,
+        245,
+        215,
+        195,
+        222,
+        70
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "NotEnoughTokensInPool",
+      "msg": "Not enough tokens in the pool"
+    }
+  ],
+  "types": [
+    {
+      "name": "PoolState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "reserve_x",
+            "type": "u64"
+          },
+          {
+            "name": "reserve_y",
+            "type": "u64"
+          },
+          {
+            "name": "token_x_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_y_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "constant_k",
+            "type": "u128"
+          }
+        ]
+      }
+    }
+  ]
+}

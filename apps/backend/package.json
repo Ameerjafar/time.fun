@@ -13,6 +13,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@coral-xyz/anchor": "^0.30.1",
     "@raydium-io/raydium-sdk-v2": "^0.2.29-alpha",
     "@repo/db": "*",
     "@solana/spl-token": "^0.4.14",

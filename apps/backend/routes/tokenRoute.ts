@@ -15,8 +15,6 @@ const router = Router();
 
 router.post("/create", createToken);
 router.post("/submit", submitTokenTransaction);
-
-// Buy/Sell routes
 router.post("/buy/prepare", prepareBuyTokenTransaction);
 router.post("/sell/prepare", prepareSellTokenTransaction);
 router.post("/trade/submit", submitBuySellTransaction);

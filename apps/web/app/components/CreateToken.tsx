@@ -1,10 +1,39 @@
 import { useState } from "react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { createTokenAndPoolFrontend } from "../lib/solanaUtils";
 
 export const CreateToken = () => {
   const [name, setName] = useState<string>("");
   const [symbol, setSymbol] = useState<string>("");
   const [description, setDescription] = useState<string>("");
   const [imageUrl, setImagUrl] = useState<string>("");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [result, setResult] = useState<{ mint: string; pool: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { connection } = useConnection();
+  const wallet = useWallet();
+
+  const onSubmit = async () => {
+    setError(null);
+    setResult(null);
+    try {
+      if (!wallet?.publicKey || !wallet?.signTransaction) {
+        throw new Error("Connect a wallet that supports signTransaction");
+      }
+      setLoading(true);
+      const { mintAddress, poolAddress } = await createTokenAndPoolFrontend(
+        connection,
+        { publicKey: wallet.publicKey, signTransaction: wallet.signTransaction! },
+        { totalSupply: 10000, decimals: 9 },
+        { programId: process.env.NEXT_PUBLIC_BONDING_CURVE_PROGRAM_ID as string, initialSol: 1, initialToken: 10000 }
+      );
+      setResult({ mint: mintAddress, pool: poolAddress });
+    } catch (e: any) {
+      setError(e?.message || "Failed to create token");
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <div> 
       <div>name</div>
@@ -31,7 +60,16 @@ export const CreateToken = () => {
         type="text"
         onChange={(e) => setImagUrl(e.target.value)}
       ></input>
-      <button type="submit"></button>
+      <button type="button" onClick={onSubmit} disabled={loading}>
+        {loading ? "Creating..." : "Create Token"}
+      </button>
+      {result && (
+        <div>
+          <div>Mint: {result.mint}</div>
+          <div>Pool: {result.pool}</div>
+        </div>
+      )}
+      {error && <div style={{ color: 'red' }}>{error}</div>}
     </div>
   );
 };

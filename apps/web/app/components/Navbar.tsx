@@ -7,8 +7,6 @@ import { WalletConnectButton } from './WalletConnectButton';
 import { TwitterLogin } from './TwitterLogin';
 import { useAuth } from '../contexts/AuthContext';
 import { useWallet } from '@solana/wallet-adapter-react';
-
-import axios from 'axios';
 import { useRouter } from 'next/navigation';
 
 export const Navbar = () => {

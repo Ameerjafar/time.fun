@@ -6,6 +6,7 @@ import { useWallet } from '@solana/wallet-adapter-react';
 import { useRouter } from 'next/navigation';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { createTokenWithWallet, isWalletConnected } from '../lib/solanaUtils';
+import { Connection } from '@solana/web3.js';
 import { 
   User, 
   Wallet, 
@@ -208,7 +209,7 @@ export default function ProfilePage() {
       return;
     }
 
-    // Check if wallet is connected and ready
+    // 
     if (!isWalletConnected(connected, publicKey, signTransaction)) {
       alert('Please connect your wallet to create a token');
       return;
@@ -220,6 +221,9 @@ export default function ProfilePage() {
       console.log('Creating token with wallet:', tokenData);
       console.log('Wallet status:', { connected, publicKey: publicKey?.toBase58(), signTransaction: !!signTransaction });
 
+      // Create Solana connection
+      const connection = new Connection('https://api.devnet.solana.com', 'confirmed');
+      
       const result = await createTokenWithWallet(
         {
           name: tokenData.name,
@@ -235,9 +239,10 @@ export default function ProfilePage() {
         },
         user.id,
         wallet,
-        signTransaction
+        signTransaction,
+        connection
       );
-
+      
       if (result.success && result.token) {
         console.log('Token created successfully:', result.token);
         
@@ -247,7 +252,7 @@ export default function ProfilePage() {
         setIsCreator(true);
         
         // Redirect to creator page
-        router.push(`/creator/${user.id}`);
+        // router.push(`/creator/${user.id}`);
       } else {
         throw new Error(result.error || 'Failed to create token');
       }

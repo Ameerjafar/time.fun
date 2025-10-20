@@ -1,19 +1,30 @@
-import { Connection, Keypair, PublicKey, SystemProgram, Transaction, LAMPORTS_PER_SOL, TransactionInstruction } from '@solana/web3.js';
-import bs58 from 'bs58';
-import { 
-  TOKEN_PROGRAM_ID, 
-  createMint, 
-  getOrCreateAssociatedTokenAccount,
-  mintTo,
-  ASSOCIATED_TOKEN_PROGRAM_ID,
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  SystemProgram,
+  Transaction,
+  LAMPORTS_PER_SOL,
+  TransactionInstruction,
+} from "@solana/web3.js";
+import bs58 from "bs58";
+import idl from "../../../../contracts/bonding_curve/target/idl/bonding_curve.json";
+
+import {
+  TOKEN_PROGRAM_ID,
   createInitializeMintInstruction,
   createMintToInstruction,
   createAssociatedTokenAccountInstruction,
-  getAssociatedTokenAddress
-} from '@solana/spl-token';
+  getOrCreateAssociatedTokenAccount,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
+import * as anchor from "@coral-xyz/anchor";
+import { publicKey } from "@raydium-io/raydium-sdk-v2";
 
-const PROGRAM_ID = new PublicKey('EJGrTzirrsJ2ukMdomaXrR31GcHpFckqqir6dqyZEx5S');
-const DEVNET_RPC = 'https://api.devnet.solana.com';
+const PROGRAM_ID = new PublicKey(
+  "EJGrTzirrsJ2ukMdomaXrR31GcHpFckqqir6dqyZEx5S"
+);
+const DEVNET_RPC = "https://api.devnet.solana.com";
 
 // Persistent payer keypair to avoid airdrop rate limits
 // In production, load this from environment variable
@@ -21,12 +32,12 @@ let cachedPayer: Keypair | null = null;
 
 function getOrCreatePayer(): Keypair {
   if (!cachedPayer) {
-    // Generate once and reuse
-    // TODO: In production, load from process.env.PAYER_PRIVATE_KEY
     cachedPayer = Keypair.generate();
     console.log(cachedPayer.publicKey);
-    console.log('Generated payer wallet:', cachedPayer.publicKey.toBase58());
-    console.log('⚠️  Fund this wallet with devnet SOL: https://faucet.solana.com');
+    console.log("Generated payer wallet:", cachedPayer.publicKey.toBase58());
+    console.log(
+      "⚠️  Fund this wallet with devnet SOL: https://faucet.solana.com"
+    );
   }
   return cachedPayer;
 }
@@ -89,51 +100,40 @@ export interface PoolInitTransactionData {
 /**
  * Create transaction data for SPL token creation (to be signed by user wallet)
  */
-export async function createTokenTransaction(params: TokenCreationParams): Promise<TransactionData> {
+export async function createTokenTransaction(
+  params: TokenCreationParams
+): Promise<TransactionData> {
   try {
-    const connection = new Connection(DEVNET_RPC, 'confirmed');
+    const connection = new Connection(DEVNET_RPC, "confirmed");
     const userPublicKey = new PublicKey(params.publicKey);
-    
-    // Generate a new mint keypair
     const mintKeypair = Keypair.generate();
     const mintAddress = mintKeypair.publicKey;
-    
-    // Get associated token account address
     const tokenAccountAddress = await getAssociatedTokenAddress(
       mintAddress,
       userPublicKey
     );
-    
-    // Get recent blockhash with longer commitment for better reliability
-    const { blockhash } = await connection.getLatestBlockhash('confirmed');
-    
-    // Create transaction
+    const { blockhash } = await connection.getLatestBlockhash("confirmed");
     const transaction = new Transaction();
     transaction.recentBlockhash = blockhash;
     transaction.feePayer = userPublicKey;
-    
-    // Create instructions
     const instructions: TransactionInstruction[] = [];
-    
-    // 1. Create mint account
+
     const createMintAccountIx = SystemProgram.createAccount({
       fromPubkey: userPublicKey,
       newAccountPubkey: mintAddress,
-      space: 82, // Mint account space
+      space: 82,
       lamports: await connection.getMinimumBalanceForRentExemption(82),
       programId: TOKEN_PROGRAM_ID,
     });
     instructions.push(createMintAccountIx);
-    
-    // 2. Initialize mint
     const initializeMintIx = createInitializeMintInstruction(
       mintAddress,
       params.decimals,
-      userPublicKey, // mint authority
-      userPublicKey  // freeze authority
+      userPublicKey, 
+      userPublicKey 
     );
     instructions.push(initializeMintIx);
-    
+
     // 3. Create associated token account
     const createTokenAccountIx = createAssociatedTokenAccountInstruction(
       userPublicKey, // payer
@@ -142,7 +142,7 @@ export async function createTokenTransaction(params: TokenCreationParams): Promi
       mintAddress // mint
     );
     instructions.push(createTokenAccountIx);
-    
+
     // 4. Mint tokens to user's account
     const mintToIx = createMintToInstruction(
       mintAddress, // mint
@@ -151,169 +151,228 @@ export async function createTokenTransaction(params: TokenCreationParams): Promi
       params.totalSupply * Math.pow(10, params.decimals) // amount
     );
     instructions.push(mintToIx);
-    
+
     // Add all instructions to transaction
     transaction.add(...instructions);
 
     // Add mint keypair as a signer AFTER instructions are added so it's a known signer
     transaction.partialSign(mintKeypair);
-    
+
     // Serialize transaction
     const serializedTransaction = transaction.serialize({
       requireAllSignatures: false,
-      verifySignatures: false
+      verifySignatures: false,
     });
-    
-    const transactionBase64 = serializedTransaction.toString('base64');
-    
-    // Convert instructions to serializable format
-    const serializableInstructions = instructions.map(ix => ({
+
+    const transactionBase64 = serializedTransaction.toString("base64");
+
+    // Convert instructions
+    const serializableInstructions = instructions.map((ix) => ({
       programId: ix.programId.toBase58(),
-      keys: ix.keys.map(key => ({
+      keys: ix.keys.map((key) => ({
         pubkey: key.pubkey.toBase58(),
         isSigner: key.isSigner,
-        isWritable: key.isWritable
+        isWritable: key.isWritable,
       })),
-      data: Buffer.from(ix.data).toString('base64')
+      data: Buffer.from(ix.data).toString("base64"),
     }));
-    
-    console.log('Token creation transaction prepared:', {
+
+    console.log("Token creation transaction prepared:", {
       mintAddress: mintAddress.toBase58(),
       tokenAccountAddress: tokenAccountAddress.toBase58(),
-      instructionCount: instructions.length
+      instructionCount: instructions.length,
     });
 
     return {
       transaction: transactionBase64,
       mintAddress: mintAddress.toBase58(),
       tokenAccountAddress: tokenAccountAddress.toBase58(),
-      instructions: serializableInstructions
+      instructions: serializableInstructions,
     };
   } catch (error) {
-    console.error('Error creating token transaction:', error);
-    throw new Error('Failed to create token transaction');
+    console.error("Error creating token transaction:", error);
+    throw new Error("Failed to create token transaction");
   }
 }
 
 /**
  * Submit a signed transaction to the Solana network
  */
-export async function submitSignedTransaction(signedTransactionBase64: string): Promise<{
+export async function submitSignedTransaction(
+  signedTransactionBase64: string
+): Promise<{
   signature: string;
   success: boolean;
 }> {
   try {
-    const connection = new Connection(DEVNET_RPC, 'confirmed');
-    
+    const connection = new Connection(DEVNET_RPC, "confirmed");
+
     // Deserialize the signed transaction
-    const transactionBuffer = Buffer.from(signedTransactionBase64, 'base64');
+    const transactionBuffer = Buffer.from(signedTransactionBase64, "base64");
     const transaction = Transaction.from(transactionBuffer);
-    
+
     try {
       // Send and confirm transaction
       const signature = await connection.sendRawTransaction(transactionBuffer, {
         skipPreflight: false,
-        preflightCommitment: 'confirmed'
+        preflightCommitment: "confirmed",
       });
 
       // Wait for confirmation
-      const confirmation = await connection.confirmTransaction(signature, 'confirmed');
-      
+      const confirmation = await connection.confirmTransaction(
+        signature,
+        "confirmed"
+      );
+
       if (confirmation.value.err) {
         throw new Error(`Transaction failed: ${confirmation.value.err}`);
       }
-      
-      console.log('Transaction confirmed:', signature);
-      
+
+      console.log("Transaction confirmed:", signature);
+
       return {
         signature,
-        success: true
+        success: true,
       };
     } catch (error: any) {
       // If the transaction was already processed, derive and return the txid
-      const message = String(error?.message || '');
-      if (message.includes('already been processed')) {
+      const message = String(error?.message || "");
+      if (message.includes("already been processed")) {
         const firstSignature = transaction.signatures[0]?.signature;
-        const derivedSignature = firstSignature ? bs58.encode(firstSignature) : '';
-        console.warn('Transaction already processed. Returning derived signature:', derivedSignature);
+        const derivedSignature = firstSignature
+          ? bs58.encode(firstSignature)
+          : "";
+        console.warn(
+          "Transaction already processed. Returning derived signature:",
+          derivedSignature
+        );
         return {
           signature: derivedSignature,
-          success: true
+          success: true,
         };
       }
-      
+
       // For blockhash errors, we need to handle this differently
-      if (message.includes('Blockhash not found')) {
-        console.error('Blockhash expired. Transaction needs to be recreated with fresh blockhash.');
-        throw new Error('Transaction blockhash expired. Please try again.');
+      if (message.includes("Blockhash not found")) {
+        console.error(
+          "Blockhash expired. Transaction needs to be recreated with fresh blockhash."
+        );
+        throw new Error("Transaction blockhash expired. Please try again.");
       }
-      
-      console.error('Error submitting transaction:', error);
-      throw new Error('Failed to submit transaction');
+
+      console.error("Error submitting transaction:", error);
+      throw new Error("Failed to submit transaction");
     }
   } catch (outerError) {
-    console.error('Error preparing transaction submission:', outerError);
-    throw new Error('Failed to submit transaction');
+    console.error("Error preparing transaction submission:", outerError);
+    throw new Error("Failed to submit transaction");
   }
 }
 
-export async function initializePool(params: PoolInitParams): Promise<{
-  poolAddress: string;
-  signature: string;
-  tokenPrice: number;
-}> {
-  try {
-    const connection = new Connection(DEVNET_RPC, 'confirmed');
-    
-    // Derive pool PDA using your program's seed structure
-    const [poolPDA] = await PublicKey.findProgramAddress(
-      [
-        Buffer.from('pool'),
-        params.solMint.toBuffer(), // token_x_mint (SOL)
-        params.tokenMint.toBuffer() // token_y_mint (creator token)
-      ],
-      PROGRAM_ID
-    );
+export async function initializePool(params: PoolInitParams) {
+  const connection = new Connection(DEVNET_RPC, "confirmed");
+  const payer = params.creatorKeypair ?? getOrCreatePayer();
+  const wallet = new anchor.Wallet(payer);
+  const provider = new anchor.AnchorProvider(connection, wallet, {
+    preflightCommitment: "confirmed",
+  });
+  anchor.setProvider(provider);
 
-    const tokenPrice = params.initialSol / params.initialToken;
-
-    console.log('Pool PDA derived for your program:', poolPDA.toBase58());
-    console.log('Program ID:', PROGRAM_ID.toBase58());
-    console.log('Initial token price:', tokenPrice, 'SOL');
-    console.log('Note: Pool initialization will be done via frontend wallet interaction');
-
+  const program = new (anchor as any).Program(idl as any, new PublicKey(process.env.PROGRAM_ID!), provider as any);
+  const [poolPDA] = await PublicKey.findProgramAddress(
+    [Buffer.from("pool"), params.solMint.toBuffer(), params.tokenMint.toBuffer()],
+    PROGRAM_ID
+  );
+  const accountInfo = await connection.getAccountInfo(poolPDA);
+  if (accountInfo) {
+    console.log("✅ Pool already exists at:", poolPDA.toBase58());
+    const existingPrice = await getTokenPrice(params.tokenMint, params.solMint);
     return {
       poolAddress: poolPDA.toBase58(),
-      signature: 'mock-signature-' + Date.now(), 
-      tokenPrice
+      signature: "",
+      tokenPrice: existingPrice,
+      alreadyExists: true,
     };
-  } catch (error) {
-    console.error('Error deriving pool address:', error);
-    throw new Error('Failed to derive pool address');
   }
-}
 
+  console.log("🚀 Initializing new pool:", poolPDA.toBase58());
+  const userTokenXAccount = await getOrCreateAssociatedTokenAccount(
+    connection,
+    payer,
+    params.solMint,
+    payer.publicKey
+  );
+  const userTokenYAccount = await getOrCreateAssociatedTokenAccount(
+    connection,
+    payer,
+    params.tokenMint,
+    payer.publicKey
+  );
+
+  const poolTokenXAccount = await getOrCreateAssociatedTokenAccount(
+    connection,
+    payer,
+    params.solMint,
+    poolPDA,
+    true // allowOwnerOffCurve for PDA
+  );
+  const poolTokenYAccount = await getOrCreateAssociatedTokenAccount(
+    connection,
+    payer,
+    params.tokenMint,
+    poolPDA,
+    true
+  );
+
+  // ✅ Call the Anchor initialize instruction
+  const txSig = await (program as any).methods
+    .initialize(new anchor.BN(params.initialSol), new anchor.BN(params.initialToken))
+    .accounts({
+      tokenXMint: params.solMint,
+      tokenYMint: params.tokenMint,
+      pool: poolPDA,
+      user: payer.publicKey,
+      userTokenXAccount: userTokenXAccount.address,
+      userTokenYAccount: userTokenYAccount.address,
+      poolTokenXAccount: poolTokenXAccount.address,
+      poolTokenYAccount: poolTokenYAccount.address,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
+      rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+    })
+    .signers([payer])
+    .rpc();
+
+  const tokenPrice = params.initialSol / params.initialToken;
+
+  console.log("✅ Pool initialized successfully!");
+  console.log("Pool PDA:", poolPDA.toBase58());
+  console.log("Transaction Signature:", txSig);
+
+  return {
+    poolAddress: poolPDA.toBase58(),
+    signature: txSig,
+    tokenPrice,
+    alreadyExists: false,
+  };
+}
 export async function getTokenPrice(
   tokenMint: PublicKey,
   solMint: PublicKey
 ): Promise<number> {
   try {
-    const connection = new Connection(DEVNET_RPC, 'confirmed');
-    
+    const connection = new Connection(DEVNET_RPC, "confirmed");
+
     const [poolPDA] = await PublicKey.findProgramAddress(
-      [
-        Buffer.from('pool'),
-        solMint.toBuffer(),
-        tokenMint.toBuffer()
-      ],
+      [Buffer.from("pool"), solMint.toBuffer(), tokenMint.toBuffer()],
       PROGRAM_ID
     );
 
     // Try to fetch pool account
     const poolAccount = await connection.getAccountInfo(poolPDA);
-    
+
     if (!poolAccount) {
-      console.log('Pool not yet initialized on-chain, returning default price');
+      console.log("Pool not yet initialized on-chain, returning default price");
       // Return default price if pool doesn't exist yet
       return 0.000001; // 1 token = 0.000001 SOL
     }
@@ -322,69 +381,75 @@ export async function getTokenPrice(
     try {
       const data = poolAccount.data;
       // PoolState structure: reserve_x (8 bytes) + reserve_y (8 bytes) + token_x_mint (32 bytes) + token_y_mint (32 bytes) + constant_k (16 bytes)
-      if (data.length >= 96) { // 8 + 8 + 32 + 32 + 16 = 96 bytes
+      if (data.length >= 96) {
+
         const reserveX = Number(data.readBigUInt64LE(0)); // reserve_x at offset 0
         const reserveY = Number(data.readBigUInt64LE(8)); // reserve_y at offset 8
-        
+
         if (reserveY > 0) {
           const price = reserveX / reserveY / LAMPORTS_PER_SOL;
           return price;
         }
       }
     } catch (decodeError) {
-      console.error('Error decoding pool data:', decodeError);
+      console.error("Error decoding pool data:", decodeError);
     }
 
     // Fallback to default price
     return 0.000001;
   } catch (error) {
-    console.error('Error getting token price:', error);
+    console.error("Error getting token price:", error);
     return 0.000001; // Default price
   }
 }
 
-/**
- * Create token transaction and derive pool address
- * Returns transaction data for frontend signing
- */
 export async function createTokenWithPoolTransaction(
   tokenParams: TokenCreationParams,
   initialSol: number = 1,
-  initialTokenSupply: number = 1000000
+  initialTokenSupply: number = 10000,
 ): Promise<{
   transactionData: TransactionData;
   poolAddress: string;
   tokenPrice: number;
 }> {
   try {
-    console.log('Creating token transaction with params:', tokenParams);
-    
-    // Step 1: Create token transaction
+    const creatorPublicKey = tokenParams.publicKey;
+    console.log("Creating token transaction with params:", tokenParams);
     const transactionData = await createTokenTransaction(tokenParams);
-    console.log('Token transaction prepared successfully:', transactionData.mintAddress);
-    
-    // Step 2: Derive pool address (actual initialization will be done via frontend)
-    const creatorKeypair = Keypair.generate(); // Temporary keypair for address derivation
-    const solMint = new PublicKey('So11111111111111111111111111111111111111112'); // Native SOL mint
-    
-    const { poolAddress, signature: poolSig, tokenPrice } = await initializePool({
+    console.log(
+      "Token transaction prepared successfully:",
+      transactionData.mintAddress
+    );
+    const creatorKeypair = getOrCreatePayer();
+    const solMint = new PublicKey(
+      "So11111111111111111111111111111111111111112"
+    ); 
+
+    const normalizedInitialSol: number = Number(initialSol ?? 1);
+    const normalizedInitialToken: number = Number(initialTokenSupply ?? 10000);
+
+    const {
+      poolAddress,
+      signature: poolSig,
+      tokenPrice,
+    } = await initializePool({
       tokenMint: new PublicKey(transactionData.mintAddress),
       solMint,
-      initialSol,
-      initialToken: initialTokenSupply,
-      creatorKeypair
+      initialSol: normalizedInitialSol,
+      initialToken: normalizedInitialToken,
+      creatorKeypair,
     });
 
-    console.log('Pool address derived:', poolAddress);
-    console.log('Initial token price:', tokenPrice, 'SOL');
+    console.log("Pool address derived:", poolAddress);
+    console.log("Initial token price:", tokenPrice, "SOL");
 
     return {
       transactionData,
       poolAddress,
-      tokenPrice
+      tokenPrice: tokenPrice ?? 0.000001,
     };
   } catch (error) {
-    console.error('Error in createTokenWithPoolTransaction:', error);
+    console.error("Error in createTokenWithPoolTransaction:", error);
     throw error;
   }
 }
@@ -422,20 +487,20 @@ export interface BuySellTransactionData {
 /**
  * Create buy token transaction with automatic pool initialization
  */
-export async function createBuyTokenTransaction(params: BuyTokenParams): Promise<BuySellTransactionData> {
+export async function createBuyTokenTransaction(
+  params: BuyTokenParams
+): Promise<BuySellTransactionData> {
   try {
-    const connection = new Connection(DEVNET_RPC, 'confirmed');
+    const connection = new Connection(DEVNET_RPC, "confirmed");
     const userPublicKey = new PublicKey(params.userPublicKey);
     const tokenMint = new PublicKey(params.tokenMint);
-    const solMint = new PublicKey('So11111111111111111111111111111111111111112');
-    
+    const solMint = new PublicKey(
+      "So11111111111111111111111111111111111111112"
+    );
+
     // Derive pool PDA
     const [poolPDA] = await PublicKey.findProgramAddress(
-      [
-        Buffer.from('pool'),
-        solMint.toBuffer(),
-        tokenMint.toBuffer()
-      ],
+      [Buffer.from("pool"), solMint.toBuffer(), tokenMint.toBuffer()],
       PROGRAM_ID
     );
 
@@ -443,7 +508,12 @@ export async function createBuyTokenTransaction(params: BuyTokenParams): Promise
     const poolAccount = await connection.getAccountInfo(poolPDA);
     const poolExists = poolAccount !== null;
 
-    console.log('Pool exists:', poolExists, 'Pool address:', poolPDA.toBase58());
+    console.log(
+      "Pool exists:",
+      poolExists,
+      "Pool address:",
+      poolPDA.toBase58()
+    );
 
     // Get user's token account
     const userTokenAccount = await getAssociatedTokenAddress(
@@ -459,8 +529,8 @@ export async function createBuyTokenTransaction(params: BuyTokenParams): Promise
     );
 
     // Get recent blockhash with longer commitment for better reliability
-    const { blockhash } = await connection.getLatestBlockhash('confirmed');
-    
+    const { blockhash } = await connection.getLatestBlockhash("confirmed");
+
     // Create transaction
     const transaction = new Transaction();
     transaction.recentBlockhash = blockhash;
@@ -468,13 +538,22 @@ export async function createBuyTokenTransaction(params: BuyTokenParams): Promise
 
     // If pool doesn't exist, we need to initialize it first
     if (!poolExists) {
-      console.log('Pool does not exist, creating pool initialization transaction');
-      
+      console.log(
+        "Pool does not exist, creating pool initialization transaction"
+      );
+
       // Get user's SOL account (native SOL)
-      const userSolAccount = await getAssociatedTokenAddress(solMint, userPublicKey);
-      
+      const userSolAccount = await getAssociatedTokenAddress(
+        solMint,
+        userPublicKey
+      );
+
       // Get pool's SOL account
-      const poolSolAccount = await getAssociatedTokenAddress(solMint, poolPDA, true);
+      const poolSolAccount = await getAssociatedTokenAddress(
+        solMint,
+        poolPDA,
+        true
+      );
 
       // Create pool initialization instruction
       const initialSolAmount = 1 * LAMPORTS_PER_SOL; // 1 SOL initial liquidity
@@ -492,14 +571,24 @@ export async function createBuyTokenTransaction(params: BuyTokenParams): Promise
           { pubkey: poolSolAccount, isSigner: false, isWritable: true }, // pool_token_x_account
           { pubkey: poolTokenAccount, isSigner: false, isWritable: true }, // pool_token_y_account
           { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
-          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
-          { pubkey: new PublicKey('SysvarRent111111111111111111111111111111111'), isSigner: false, isWritable: false }, // rent
+          {
+            pubkey: SystemProgram.programId,
+            isSigner: false,
+            isWritable: false,
+          }, // system_program
+          {
+            pubkey: new PublicKey(
+              "SysvarRent111111111111111111111111111111111"
+            ),
+            isSigner: false,
+            isWritable: false,
+          }, // rent
         ],
         data: Buffer.concat([
           Buffer.from([175, 175, 109, 31, 13, 152, 155, 237]), // initialize discriminator
           Buffer.alloc(8), // initial_sol placeholder
           Buffer.alloc(8), // initial_token placeholder
-        ])
+        ]),
       });
 
       // Set the amounts in the instruction data
@@ -507,17 +596,17 @@ export async function createBuyTokenTransaction(params: BuyTokenParams): Promise
       initialSolBuffer.writeBigUInt64LE(BigInt(initialSolAmount), 0);
       const initialTokenBuffer = Buffer.alloc(8);
       initialTokenBuffer.writeBigUInt64LE(BigInt(initialTokenAmount), 0);
-      
+
       initializeInstruction.data = Buffer.concat([
         Buffer.from([175, 175, 109, 31, 13, 152, 155, 237]),
         initialSolBuffer,
-        initialTokenBuffer
+        initialTokenBuffer,
       ]);
 
       transaction.add(initializeInstruction);
-      console.log('Added pool initialization instruction');
+      console.log("Added pool initialization instruction");
     }
-    
+
     // Create buy instruction with proper account structure
     const buyInstruction = new TransactionInstruction({
       programId: PROGRAM_ID,
@@ -533,7 +622,7 @@ export async function createBuyTokenTransaction(params: BuyTokenParams): Promise
       data: Buffer.concat([
         Buffer.from([102, 6, 61, 18, 1, 218, 235, 234]), // buy discriminator from IDL
         Buffer.alloc(8), // amount_out_token placeholder
-      ])
+      ]),
     });
 
     // Set the amount in the instruction data
@@ -541,7 +630,7 @@ export async function createBuyTokenTransaction(params: BuyTokenParams): Promise
     amountBuffer.writeBigUInt64LE(BigInt(params.amountOutToken), 0);
     buyInstruction.data = Buffer.concat([
       Buffer.from([102, 6, 61, 18, 1, 218, 235, 234]),
-      amountBuffer
+      amountBuffer,
     ]);
 
     transaction.add(buyInstruction);
@@ -549,58 +638,58 @@ export async function createBuyTokenTransaction(params: BuyTokenParams): Promise
     // Serialize transaction
     const serializedTransaction = transaction.serialize({
       requireAllSignatures: false,
-      verifySignatures: false
+      verifySignatures: false,
     });
-    
-    const transactionBase64 = serializedTransaction.toString('base64');
-    
+
+    const transactionBase64 = serializedTransaction.toString("base64");
+
     // Convert instructions to serializable format
-    const serializableInstructions = transaction.instructions.map(ix => ({
+    const serializableInstructions = transaction.instructions.map((ix) => ({
       programId: ix.programId.toBase58(),
-      keys: ix.keys.map(key => ({
+      keys: ix.keys.map((key) => ({
         pubkey: key.pubkey.toBase58(),
         isSigner: key.isSigner,
-        isWritable: key.isWritable
+        isWritable: key.isWritable,
       })),
-      data: Buffer.from(ix.data).toString('base64')
+      data: Buffer.from(ix.data).toString("base64"),
     }));
 
-    console.log('Buy token transaction prepared:', {
+    console.log("Buy token transaction prepared:", {
       tokenMint: params.tokenMint,
       amountOutToken: params.amountOutToken,
       poolAddress: poolPDA.toBase58(),
-      poolInitialized: !poolExists
+      poolInitialized: !poolExists,
     });
 
     return {
       transaction: transactionBase64,
       instructions: serializableInstructions,
       estimatedTokenAmount: params.amountOutToken,
-      poolInitialized: !poolExists
+      poolInitialized: !poolExists,
     };
   } catch (error) {
-    console.error('Error creating buy token transaction:', error);
-    throw new Error('Failed to create buy token transaction');
+    console.error("Error creating buy token transaction:", error);
+    throw new Error("Failed to create buy token transaction");
   }
 }
 
 /**
  * Create sell token transaction
  */
-export async function createSellTokenTransaction(params: SellTokenParams): Promise<BuySellTransactionData> {
+export async function createSellTokenTransaction(
+  params: SellTokenParams
+): Promise<BuySellTransactionData> {
   try {
-    const connection = new Connection(DEVNET_RPC, 'confirmed');
+    const connection = new Connection(DEVNET_RPC, "confirmed");
     const userPublicKey = new PublicKey(params.userPublicKey);
     const tokenMint = new PublicKey(params.tokenMint);
-    const solMint = new PublicKey('So11111111111111111111111111111111111111112');
-    
+    const solMint = new PublicKey(
+      "So11111111111111111111111111111111111111112"
+    );
+
     // Derive pool PDA
     const [poolPDA] = await PublicKey.findProgramAddress(
-      [
-        Buffer.from('pool'),
-        solMint.toBuffer(),
-        tokenMint.toBuffer()
-      ],
+      [Buffer.from("pool"), solMint.toBuffer(), tokenMint.toBuffer()],
       PROGRAM_ID
     );
 
@@ -618,13 +707,13 @@ export async function createSellTokenTransaction(params: SellTokenParams): Promi
     );
 
     // Get recent blockhash with longer commitment for better reliability
-    const { blockhash } = await connection.getLatestBlockhash('confirmed');
-    
+    const { blockhash } = await connection.getLatestBlockhash("confirmed");
+
     // Create transaction
     const transaction = new Transaction();
     transaction.recentBlockhash = blockhash;
     transaction.feePayer = userPublicKey;
-    
+
     // Create sell instruction with proper account structure
     const sellInstruction = new TransactionInstruction({
       programId: PROGRAM_ID,
@@ -640,7 +729,7 @@ export async function createSellTokenTransaction(params: SellTokenParams): Promi
       data: Buffer.concat([
         Buffer.from([51, 230, 133, 164, 1, 127, 131, 173]), // sell discriminator from IDL
         Buffer.alloc(8), // amount_in_token placeholder
-      ])
+      ]),
     });
 
     // Set the amount in the instruction data
@@ -648,7 +737,7 @@ export async function createSellTokenTransaction(params: SellTokenParams): Promi
     amountBuffer.writeBigUInt64LE(BigInt(params.amountInToken), 0);
     sellInstruction.data = Buffer.concat([
       Buffer.from([51, 230, 133, 164, 1, 127, 131, 173]),
-      amountBuffer
+      amountBuffer,
     ]);
 
     transaction.add(sellInstruction);
@@ -656,36 +745,36 @@ export async function createSellTokenTransaction(params: SellTokenParams): Promi
     // Serialize transaction
     const serializedTransaction = transaction.serialize({
       requireAllSignatures: false,
-      verifySignatures: false
+      verifySignatures: false,
     });
-    
-    const transactionBase64 = serializedTransaction.toString('base64');
-    
+
+    const transactionBase64 = serializedTransaction.toString("base64");
+
     // Convert instructions to serializable format
-    const serializableInstructions = transaction.instructions.map(ix => ({
+    const serializableInstructions = transaction.instructions.map((ix) => ({
       programId: ix.programId.toBase58(),
-      keys: ix.keys.map(key => ({
+      keys: ix.keys.map((key) => ({
         pubkey: key.pubkey.toBase58(),
         isSigner: key.isSigner,
-        isWritable: key.isWritable
+        isWritable: key.isWritable,
       })),
-      data: Buffer.from(ix.data).toString('base64')
+      data: Buffer.from(ix.data).toString("base64"),
     }));
 
-    console.log('Sell token transaction prepared:', {
+    console.log("Sell token transaction prepared:", {
       tokenMint: params.tokenMint,
       amountInToken: params.amountInToken,
-      poolAddress: poolPDA.toBase58()
+      poolAddress: poolPDA.toBase58(),
     });
 
     return {
       transaction: transactionBase64,
       instructions: serializableInstructions,
-      estimatedTokenAmount: params.amountInToken
+      estimatedTokenAmount: params.amountInToken,
     };
   } catch (error) {
-    console.error('Error creating sell token transaction:', error);
-    throw new Error('Failed to create sell token transaction');
+    console.error("Error creating sell token transaction:", error);
+    throw new Error("Failed to create sell token transaction");
   }
 }
 
@@ -698,9 +787,9 @@ export async function transferSolToCreator(
   payerKeypair: Keypair
 ): Promise<{ signature: string; success: boolean }> {
   try {
-    const connection = new Connection(DEVNET_RPC, 'confirmed');
+    const connection = new Connection(DEVNET_RPC, "confirmed");
     const creatorPubkey = new PublicKey(creatorPublicKey);
-    
+
     const transaction = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: payerKeypair.publicKey,
@@ -709,58 +798,72 @@ export async function transferSolToCreator(
       })
     );
 
-    const signature = await connection.sendTransaction(transaction, [payerKeypair]);
+    const signature = await connection.sendTransaction(transaction, [
+      payerKeypair,
+    ]);
     await connection.confirmTransaction(signature);
 
-    console.log('SOL transferred to creator:', {
+    console.log("SOL transferred to creator:", {
       creator: creatorPublicKey,
       amount: amountLamports / LAMPORTS_PER_SOL,
-      signature
+      signature,
     });
 
     return { signature, success: true };
   } catch (error) {
-    console.error('Error transferring SOL to creator:', error);
-    throw new Error('Failed to transfer SOL to creator');
+    console.error("Error transferring SOL to creator:", error);
+    throw new Error("Failed to transfer SOL to creator");
   }
 }
 
 /**
  * Create pool initialization transaction for your bonding curve program
  */
-export async function createPoolInitTransaction(params: PoolInitTransactionParams): Promise<PoolInitTransactionData> {
+export async function createPoolInitTransaction(
+  params: PoolInitTransactionParams
+): Promise<PoolInitTransactionData> {
   try {
-    const connection = new Connection(DEVNET_RPC, 'confirmed');
+    const connection = new Connection(DEVNET_RPC, "confirmed");
     const userPublicKey = new PublicKey(params.userPublicKey);
     const tokenMint = new PublicKey(params.tokenMint);
     const solMint = new PublicKey(params.solMint);
-    
+
     // Derive pool PDA
     const [poolPDA] = await PublicKey.findProgramAddress(
-      [
-        Buffer.from('pool'),
-        solMint.toBuffer(),
-        tokenMint.toBuffer()
-      ],
+      [Buffer.from("pool"), solMint.toBuffer(), tokenMint.toBuffer()],
       PROGRAM_ID
     );
 
     // Get user's token accounts
-    const userTokenXAccount = await getAssociatedTokenAddress(solMint, userPublicKey); // SOL account
-    const userTokenYAccount = await getAssociatedTokenAddress(tokenMint, userPublicKey); // Creator token account
+    const userTokenXAccount = await getAssociatedTokenAddress(
+      solMint,
+      userPublicKey
+    ); // SOL account
+    const userTokenYAccount = await getAssociatedTokenAddress(
+      tokenMint,
+      userPublicKey
+    ); // Creator token account
 
     // Get pool's token accounts
-    const poolTokenXAccount = await getAssociatedTokenAddress(solMint, poolPDA, true);
-    const poolTokenYAccount = await getAssociatedTokenAddress(tokenMint, poolPDA, true);
+    const poolTokenXAccount = await getAssociatedTokenAddress(
+      solMint,
+      poolPDA,
+      true
+    );
+    const poolTokenYAccount = await getAssociatedTokenAddress(
+      tokenMint,
+      poolPDA,
+      true
+    );
 
     // Get recent blockhash with longer commitment for better reliability
-    const { blockhash } = await connection.getLatestBlockhash('confirmed');
-    
+    const { blockhash } = await connection.getLatestBlockhash("confirmed");
+
     // Create transaction
     const transaction = new Transaction();
     transaction.recentBlockhash = blockhash;
     transaction.feePayer = userPublicKey;
-    
+
     // Create initialize instruction based on your program's IDL
     const initializeInstruction = new TransactionInstruction({
       programId: PROGRAM_ID,
@@ -775,13 +878,17 @@ export async function createPoolInitTransaction(params: PoolInitTransactionParam
         { pubkey: poolTokenYAccount, isSigner: false, isWritable: true }, // pool_token_y_account
         { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
-        { pubkey: new PublicKey('SysvarRent111111111111111111111111111111111'), isSigner: false, isWritable: false }, // rent
+        {
+          pubkey: new PublicKey("SysvarRent111111111111111111111111111111111"),
+          isSigner: false,
+          isWritable: false,
+        }, // rent
       ],
       data: Buffer.concat([
         Buffer.from([175, 175, 109, 31, 13, 152, 155, 237]), // initialize discriminator from IDL
         Buffer.alloc(8), // initial_sol placeholder
         Buffer.alloc(8), // initial_token placeholder
-      ])
+      ]),
     });
 
     // Set the amounts in the instruction data
@@ -789,11 +896,11 @@ export async function createPoolInitTransaction(params: PoolInitTransactionParam
     initialSolBuffer.writeBigUInt64LE(BigInt(params.initialSol), 0);
     const initialTokenBuffer = Buffer.alloc(8);
     initialTokenBuffer.writeBigUInt64LE(BigInt(params.initialToken), 0);
-    
+
     initializeInstruction.data = Buffer.concat([
       Buffer.from([175, 175, 109, 31, 13, 152, 155, 237]),
       initialSolBuffer,
-      initialTokenBuffer
+      initialTokenBuffer,
     ]);
 
     transaction.add(initializeInstruction);
@@ -801,36 +908,36 @@ export async function createPoolInitTransaction(params: PoolInitTransactionParam
     // Serialize transaction
     const serializedTransaction = transaction.serialize({
       requireAllSignatures: false,
-      verifySignatures: false
+      verifySignatures: false,
     });
-    
-    const transactionBase64 = serializedTransaction.toString('base64');
-    
+
+    const transactionBase64 = serializedTransaction.toString("base64");
+
     // Convert instructions to serializable format
-    const serializableInstructions = transaction.instructions.map(ix => ({
+    const serializableInstructions = transaction.instructions.map((ix) => ({
       programId: ix.programId.toBase58(),
-      keys: ix.keys.map(key => ({
+      keys: ix.keys.map((key) => ({
         pubkey: key.pubkey.toBase58(),
         isSigner: key.isSigner,
-        isWritable: key.isWritable
+        isWritable: key.isWritable,
       })),
-      data: Buffer.from(ix.data).toString('base64')
+      data: Buffer.from(ix.data).toString("base64"),
     }));
 
-    console.log('Pool initialization transaction prepared for your program:', {
+    console.log("Pool initialization transaction prepared for your program:", {
       poolAddress: poolPDA.toBase58(),
       programId: PROGRAM_ID.toBase58(),
       initialSol: params.initialSol,
-      initialToken: params.initialToken
+      initialToken: params.initialToken,
     });
 
     return {
       transaction: transactionBase64,
       poolAddress: poolPDA.toBase58(),
-      instructions: serializableInstructions
+      instructions: serializableInstructions,
     };
   } catch (error) {
-    console.error('Error creating pool initialization transaction:', error);
-    throw new Error('Failed to create pool initialization transaction');
+    console.error("Error creating pool initialization transaction:", error);
+    throw new Error("Failed to create pool initialization transaction");
   }
 }
