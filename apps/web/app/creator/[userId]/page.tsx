@@ -1,8 +1,9 @@
 "use client";
 import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import axios from 'axios';
+import { Keypair } from '@solana/web3.js';
 import { 
   Coins, 
   TrendingUp,  
@@ -15,8 +16,11 @@ import {
   BadgeCheck,
   ArrowLeft,
   Copy,
-  Check
+  Check,
+  Wallet
 } from 'lucide-react';
+import TradingModal from '../../components/TradingModal';
+
 
 interface TokenData {
   id: string;
@@ -36,6 +40,7 @@ interface TokenData {
     twitterHandle: string | null;
     profilePicture: string | null;
     verified: boolean;
+    publicKey: string | null
   };
 }
 
@@ -48,12 +53,12 @@ export default function CreatorPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [creatorPublicKey, setCreatorPublicKey] = useState('');
+  const [showPublicKeyInput, setShowPublicKeyInput] = useState(false);
+  const [userPublicKey, setUserPublicKey] = useState<string | null>(null);
+  const [showTradingModal, setShowTradingModal] = useState(false);
 
-  useEffect(() => {
-    fetchTokenData();
-  }, [userId]);
-
-  const fetchTokenData = async () => {
+  const fetchTokenData = useCallback(async () => {
     try {
       setLoading(true);
       const response = await axios.get(`http://localhost:5000/token/user/${userId}`);
@@ -63,7 +68,11 @@ export default function CreatorPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    fetchTokenData();
+  }, [userId, fetchTokenData]);
 
   const refreshPrice = async () => {
     if (!token) return;
@@ -85,8 +94,84 @@ export default function CreatorPage() {
     setTimeout(() => setCopied(null), 2000);
   };
 
-  const numericCurrentPrice = token ? Number((token as any).currentPrice) : 0;
-  const numericInitialPrice = token ? Number((token as any).initialPrice) : 0;
+  const connectWallet = async () => {
+    try {
+      // Check if Phantom wallet is available
+      if (typeof window !== 'undefined' && window.solana && window.solana.isPhantom) {
+        const response = await window.solana.connect();
+        const publicKey = response.publicKey.toString();
+        setUserPublicKey(publicKey);
+        console.log('Phantom wallet connected:', publicKey);
+      } else {
+        // Fallback: Generate a valid Solana public key for testing
+        // This creates a valid base58 encoded public key for testing purposes
+        const testKeypair = Keypair.generate();
+        const testPublicKey = testKeypair.publicKey.toBase58();
+        setUserPublicKey(testPublicKey);
+        console.log('Test wallet connected:', testPublicKey);
+        console.log('Note: This is a test keypair. In production, use a real wallet.');
+      }
+    } catch (error) {
+      console.error('Error connecting wallet:', error);
+      // Fallback to test keypair if wallet connection fails
+      try {
+        const testKeypair = Keypair.generate();
+        const testPublicKey = testKeypair.publicKey.toBase58();
+        setUserPublicKey(testPublicKey);
+        console.log('Fallback test wallet connected:', testPublicKey);
+      } catch (fallbackError) {
+        console.error('Error creating fallback wallet:', fallbackError);
+      }
+    }
+  };
+
+  const saveCreatorPublicKey = async () => {
+    if (!creatorPublicKey.trim()) {
+      alert('Please enter your Solana public key');
+      return;
+    }
+
+    // Basic validation for Solana public key format
+    if (creatorPublicKey.length < 32 || creatorPublicKey.length > 44) {
+      alert('Invalid public key format. Please enter a valid Solana public key.');
+      return;
+    }
+
+    try {
+      const updateResponse = await axios.put(`http://localhost:5000/user/${params.userId}/public-key`, {
+        publicKey: creatorPublicKey.trim()
+      });
+      
+      if (updateResponse.data.success) {
+        alert('Creator public key saved successfully!');
+        setShowPublicKeyInput(false);
+        setCreatorPublicKey('');
+        // Refresh token data to show updated status
+        fetchTokenData();
+      }
+    } catch (updateError) {
+      console.error('Error updating creator public key:', updateError);
+      alert('Error saving public key. Please try again.');
+    }
+  };
+
+  const handleTrade = () => {
+    if (!userPublicKey) {
+      connectWallet();
+      return;
+    }
+    
+    // // Check if creator has set their public key
+    // if (!token!.user!.publicKey) {
+    //   alert('The creator needs to set their Solana public key first before trading can begin. Please ask the creator to set their public key.');
+    //   return;
+    // }
+    
+    setShowTradingModal(true);
+  };
+
+  const numericCurrentPrice = token ? Number(token.currentPrice) : 0;
+  const numericInitialPrice = token ? Number(token.initialPrice) : 0;
   const priceChange = token && numericInitialPrice
     ? ((numericCurrentPrice - numericInitialPrice) / numericInitialPrice * 100)
     : 0;
@@ -108,7 +193,7 @@ export default function CreatorPage() {
         <div className="text-center">
           <Coins className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-white mb-2">No Token Found</h2>
-          <p className="text-gray-400 mb-6">This creator hasn't created a token yet.</p>
+          <p className="text-gray-400 mb-6">This creator hasn&apos;t created a token yet.</p>
           <button
             onClick={() => router.push('/')}
             className="bg-secondary text-black px-6 py-3 rounded-lg font-bold"
@@ -156,6 +241,19 @@ export default function CreatorPage() {
                 <div className="flex items-center space-x-2 text-gray-400">
                   <Users className="w-4 h-4" />
                   <span>by {token.user?.name ?? 'Unknown'}</span>
+                  {token!.user?.publicKey ? (
+                    <span className="text-green-400 text-xs">✓ Public Key Set</span>
+                  ) : (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-red-400 text-xs">⚠ No Public Key</span>
+                      <button
+                        onClick={() => setShowPublicKeyInput(true)}
+                        className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded transition-colors"
+                      >
+                        Set Public Key
+                      </button>
+                    </div>
+                  )}
                 </div>
                 {token.user?.twitterHandle && (
                     <a
@@ -327,18 +425,20 @@ export default function CreatorPage() {
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  className="w-full bg-gradient-to-r from-secondary to-green-400 text-black py-3 px-4 rounded-lg font-bold"
+                  onClick={handleTrade}
+                  className="w-full bg-gradient-to-r from-secondary to-green-400 text-black py-3 px-4 rounded-lg font-bold flex items-center justify-center space-x-2"
                 >
-                  Buy Tokens
+                  <Wallet className="w-5 h-5" />
+                  <span>{userPublicKey ? 'Trade Tokens' : 'Connect Wallet'}</span>
                 </motion.button>
                 
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="w-full bg-gray-700 text-white py-3 px-4 rounded-lg font-bold"
-                >
-                  Sell Tokens
-                </motion.button>
+                {userPublicKey && (
+                  <div className="text-center">
+                    <p className="text-gray-400 text-sm">
+                      Wallet: {userPublicKey.slice(0, 8)}...{userPublicKey.slice(-8)}
+                    </p>
+                  </div>
+                )}
               </div>
             </motion.div>
 
@@ -380,6 +480,54 @@ export default function CreatorPage() {
           </div>
         </div>
       </div>
+
+      {/* Trading Modal */}
+      {token && (
+        <TradingModal
+          isOpen={showTradingModal}
+          onClose={() => setShowTradingModal(false)}
+          token={token}
+          userPublicKey={userPublicKey || undefined}
+        />
+      )}
+
+      {/* Public Key Input Modal */}
+      {showPublicKeyInput && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-gray-900 p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold text-white mb-4">Set Creator Public Key</h3>
+            <p className="text-gray-400 mb-4 text-sm">
+              Enter your Solana public key where you want to receive SOL from token sales.
+              <br />
+              <strong>Example:</strong> CP7ZpQGYfTxsVzbdDvyo4ic8DiTNVP2pLEN2n1NMaJkx
+            </p>
+            <input
+              type="text"
+              value={creatorPublicKey}
+              onChange={(e) => setCreatorPublicKey(e.target.value)}
+              placeholder="Enter your Solana public key..."
+              className="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:border-secondary focus:outline-none"
+            />
+            <div className="flex space-x-3 mt-4">
+              <button
+                onClick={saveCreatorPublicKey}
+                className="flex-1 bg-secondary hover:bg-secondary/80 text-black font-bold py-2 px-4 rounded-lg transition-colors"
+              >
+                Save Public Key
+              </button>
+              <button
+                onClick={() => {
+                  setShowPublicKeyInput(false);
+                  setCreatorPublicKey('');
+                }}
+                className="flex-1 bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

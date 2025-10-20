@@ -24,6 +24,7 @@ model User {
   verified       Boolean         @default(false)
   twitterId      String?         @unique
   twitterHandle  String?
+  publicKey      String?         @unique // Solana public key
   createdAt      DateTime        @default(now())
   lastLoggedAt   DateTime
   userHoldTokens UserHoldToken[]

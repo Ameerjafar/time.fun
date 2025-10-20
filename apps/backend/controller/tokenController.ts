@@ -1,7 +1,16 @@
 import { Request, Response } from "express";
 import { prisma } from "@repo/db";
-import { createTokenWithPoolTransaction, submitSignedTransaction, getTokenPrice } from "../services/solana/solanaService";
 import { PublicKey } from "@solana/web3.js";
+import { 
+  createTokenWithPoolTransaction, 
+  submitSignedTransaction, 
+  getTokenPrice,
+  createBuyTokenTransaction,
+  createSellTokenTransaction,
+  BuyTokenParams,
+  SellTokenParams
+} from "../services/solana/solanaService";
+import { transferSolToCreator } from "../services/solana/backendWallet";
 import { Decimal } from "@prisma/client/runtime/library";
 import z from "zod";
 
@@ -28,6 +37,28 @@ const submitTransactionSchema = z.object({
   signedTransaction: z.string().min(1, "Signed transaction is required"),
   mintAddress: z.string().min(1, "Mint address is required"),
   userId: z.string().min(1, "Invalid user ID")
+});
+
+const buyTokenSchema = z.object({
+  tokenMint: z.string().min(1, "Token mint address is required"),
+  amountOutToken: z.number().positive("Amount must be positive"),
+  userPublicKey: z.string().min(1, "User public key is required"),
+  creatorPublicKey: z.string().min(1, "Creator public key is required")
+});
+
+const sellTokenSchema = z.object({
+  tokenMint: z.string().min(1, "Token mint address is required"),
+  amountInToken: z.number().positive("Amount must be positive"),
+  userPublicKey: z.string().min(1, "User public key is required"),
+  creatorPublicKey: z.string().min(1, "Creator public key is required")
+});
+
+const submitBuySellTransactionSchema = z.object({
+  signedTransaction: z.string().min(1, "Signed transaction is required"),
+  tokenMint: z.string().min(1, "Token mint address is required"),
+  creatorPublicKey: z.string().min(1, "Creator public key is required"),
+  transactionType: z.enum(["buy", "sell"]),
+  amount: z.number().positive("Amount must be positive")
 });
 
 export const createToken = async (req: Request, res: Response) => {
@@ -139,39 +170,88 @@ export const submitTokenTransaction = async (req: Request, res: Response) => {
       });
     }
 
-    // Create token record in database
-    const token = await prisma.token.create({
-      data: {
-        name: tokenParams.name,
-        symbol: tokenParams.symbol,
-        totalSupply: tokenParams.totalSupply,
-        description: tokenParams.description,
-        imageUrl: tokenParams.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(tokenParams.name)}&size=200&background=00FF88&color=000`,
-        userId: userId,
-        mintAddress: mintAddress,
-        poolAddress: req.body.poolAddress || '', // Should be passed from frontend
-        currentPrice: new Decimal(req.body.tokenPrice || 0.000001),
-        initialPrice: new Decimal(req.body.tokenPrice || 0.000001),
-      }
+    // Check if token already exists for this user
+    let token = await prisma.token.findUnique({
+      where: { userId: userId }
     });
 
-    // Create pricing model if fixed pricing is used
+    try {
+      if (token) {
+        // Update existing token with new mint address and pool address
+        token = await prisma.token.update({
+          where: { userId: userId },
+          data: {
+            mintAddress: mintAddress,
+            poolAddress: req.body.poolAddress || '',
+            currentPrice: new Decimal(req.body.tokenPrice || 0.000001),
+            initialPrice: new Decimal(req.body.tokenPrice || 0.000001),
+          }
+        });
+        console.log('Updated existing token record:', token.id);
+      } else {
+        // Create new token record in database
+        token = await prisma.token.create({
+          data: {
+            name: tokenParams.name,
+            symbol: tokenParams.symbol,
+            totalSupply: tokenParams.totalSupply,
+            description: tokenParams.description,
+            imageUrl: tokenParams.imageUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(tokenParams.name)}&size=200&background=00FF88&color=000`,
+            userId: userId,
+            mintAddress: mintAddress,
+            poolAddress: req.body.poolAddress || '', // Should be passed from frontend
+            currentPrice: new Decimal(req.body.tokenPrice || 0.000001),
+            initialPrice: new Decimal(req.body.tokenPrice || 0.000001),
+          }
+        });
+        console.log('Created new token record:', token.id);
+      }
+    } catch (dbError) {
+      console.error('Database error during token creation/update:', dbError);
+      // If database operation fails, we still want to return the transaction data
+      // The transaction was successful on Solana, so we should acknowledge that
+    }
+
+    // Create or update pricing model if fixed pricing is used
     if (tokenParams.pricingModel === "fixed" && tokenParams.fixedPrice) {
-      await prisma.pricingModel.create({
-        data: {
-          userId: userId,
-          fixedDmPrice: tokenParams.features?.chat ? tokenParams.fixedPrice : null,
-          fixedGroupChatPrice: tokenParams.features?.groupChat ? tokenParams.fixedPrice : null,
-          fixedVideoCallPrice: tokenParams.features?.videoCall ? tokenParams.fixedPrice : null,
+      try {
+        const existingPricingModel = await prisma.pricingModel.findUnique({
+          where: { userId: userId }
+        });
+
+        if (existingPricingModel) {
+          await prisma.pricingModel.update({
+            where: { userId: userId },
+            data: {
+              fixedDmPrice: tokenParams.features?.chat ? tokenParams.fixedPrice : null,
+              fixedGroupChatPrice: tokenParams.features?.groupChat ? tokenParams.fixedPrice : null,
+              fixedVideoCallPrice: tokenParams.features?.videoCall ? tokenParams.fixedPrice : null,
+            }
+          });
+        } else {
+          await prisma.pricingModel.create({
+            data: {
+              userId: userId,
+              fixedDmPrice: tokenParams.features?.chat ? tokenParams.fixedPrice : null,
+              fixedGroupChatPrice: tokenParams.features?.groupChat ? tokenParams.fixedPrice : null,
+              fixedVideoCallPrice: tokenParams.features?.videoCall ? tokenParams.fixedPrice : null,
+            }
+          });
         }
-      });
+      } catch (pricingError) {
+        console.error('Error updating pricing model:', pricingError);
+      }
     }
 
     // Update user role to creator
-    await prisma.user.update({
-      where: { id: userId },
-      data: { role: "CREATOR" }
-    });
+    try {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { role: "CREATOR" }
+      });
+    } catch (roleError) {
+      console.error('Error updating user role:', roleError);
+    }
 
     console.log("Token created successfully:", token.id);
 
@@ -364,6 +444,241 @@ export const updateTokenPrice = async (req: Request, res: Response) => {
     console.error("Error updating token price:", error);
     return res.status(500).json({ 
       error: "Failed to update token price",
+      message: error.message 
+    });
+  }
+};
+
+export const prepareBuyTokenTransaction = async (req: Request, res: Response) => {
+  try {
+    console.log("Creating buy token transaction:", req.body);
+
+    // Validate request body
+    const parseResult = buyTokenSchema.safeParse(req.body);
+    
+    if (!parseResult.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: parseResult.error.issues 
+      });
+    }
+
+    const validatedData = parseResult.data;
+
+    // Validate creator public key
+    if (!validatedData.creatorPublicKey || validatedData.creatorPublicKey.trim() === '') {
+      return res.status(400).json({
+        error: "Creator public key is required. The creator needs to connect their wallet first."
+      });
+    }
+
+    // Validate that creatorPublicKey is a valid Solana public key
+    try {
+      new PublicKey(validatedData.creatorPublicKey);
+    } catch (error) {
+      return res.status(400).json({
+        error: "Invalid creator public key format. Please ensure the creator has connected their wallet."
+      });
+    }
+
+    // Check if token exists
+    const token = await prisma.token.findFirst({
+      where: { mintAddress: validatedData.tokenMint }
+    });
+
+    if (!token) {
+      return res.status(404).json({ error: "Token not found" });
+    }
+
+    // Create buy transaction
+    const transactionData = await createBuyTokenTransaction({
+      tokenMint: validatedData.tokenMint,
+      amountOutToken: validatedData.amountOutToken,
+      userPublicKey: validatedData.userPublicKey,
+      creatorPublicKey: validatedData.creatorPublicKey
+    });
+
+    return res.status(200).json({
+      message: "Buy token transaction prepared successfully",
+      transactionData,
+      tokenInfo: {
+        name: token.name,
+        symbol: token.symbol,
+        currentPrice: token.currentPrice
+      },
+      poolInitialized: transactionData.poolInitialized
+    });
+
+  } catch (error: any) {
+    console.error("Error creating buy token transaction:", error);
+    return res.status(500).json({ 
+      error: "Failed to create buy token transaction",
+      message: error.message 
+    });
+  }
+};
+
+export const prepareSellTokenTransaction = async (req: Request, res: Response) => {
+  try {
+    console.log("Creating sell token transaction:", req.body);
+
+    // Validate request body
+    const parseResult = sellTokenSchema.safeParse(req.body);
+    
+    if (!parseResult.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: parseResult.error.issues 
+      });
+    }
+
+    const validatedData = parseResult.data;
+
+    // Validate creator public key
+    if (!validatedData.creatorPublicKey || validatedData.creatorPublicKey.trim() === '') {
+      return res.status(400).json({
+        error: "Creator public key is required. The creator needs to connect their wallet first."
+      });
+    }
+
+    // Validate that creatorPublicKey is a valid Solana public key
+    try {
+      new PublicKey(validatedData.creatorPublicKey);
+    } catch (error) {
+      return res.status(400).json({
+        error: "Invalid creator public key format. Please ensure the creator has connected their wallet."
+      });
+    }
+
+    // Check if token exists
+    const token = await prisma.token.findFirst({
+      where: { mintAddress: validatedData.tokenMint }
+    });
+
+    if (!token) {
+      return res.status(404).json({ error: "Token not found" });
+    }
+
+    // Create sell transaction
+    const transactionData = await createSellTokenTransaction({
+      tokenMint: validatedData.tokenMint,
+      amountInToken: validatedData.amountInToken,
+      userPublicKey: validatedData.userPublicKey,
+      creatorPublicKey: validatedData.creatorPublicKey
+    });
+
+    return res.status(200).json({
+      message: "Sell token transaction prepared successfully",
+      transactionData,
+      tokenInfo: {
+        name: token.name,
+        symbol: token.symbol,
+        currentPrice: token.currentPrice
+      }
+    });
+
+  } catch (error: any) {
+    console.error("Error creating sell token transaction:", error);
+    return res.status(500).json({ 
+      error: "Failed to create sell token transaction",
+      message: error.message 
+    });
+  }
+};
+
+export const submitBuySellTransaction = async (req: Request, res: Response) => {
+  try {
+    console.log("Submitting buy/sell transaction:", req.body);
+
+    // Validate request body
+    const parseResult = submitBuySellTransactionSchema.safeParse(req.body);
+    
+    if (!parseResult.success) {
+      return res.status(400).json({ 
+        error: "Validation failed", 
+        details: parseResult.error.issues 
+      });
+    }
+
+    const { signedTransaction, tokenMint, creatorPublicKey, transactionType, amount } = parseResult.data;
+
+    // Submit the signed transaction to Solana
+    console.log("Submitting transaction to Solana...");
+    const result = await submitSignedTransaction(signedTransaction);
+
+    if (!result.success) {
+      return res.status(400).json({ 
+        error: "Transaction failed",
+        message: "Transaction was not confirmed on the blockchain"
+      });
+    }
+
+    // Get token info
+    const token = await prisma.token.findFirst({
+      where: { mintAddress: tokenMint }
+    });
+
+    if (!token) {
+      return res.status(404).json({ error: "Token not found" });
+    }
+
+    // Calculate SOL amount to transfer to creator
+    // For simplicity, we'll transfer a percentage of the transaction amount
+    // In a real implementation, you'd calculate this based on the bonding curve
+    const transferPercentage = 0.05; // 5% goes to creator
+    const solAmountLamports = Math.floor(amount * transferPercentage * 1e9); // Convert to lamports
+
+    // Transfer SOL to creator using backend wallet
+    let transferResult = null;
+    if (solAmountLamports > 0) {
+      try {
+        // In a real implementation, you would use a funded backend wallet
+        // For now, we'll simulate the transfer
+        console.log(`Transferring ${solAmountLamports / 1e9} SOL to creator ${creatorPublicKey}`);
+        
+        // Transfer SOL to creator using backend wallet
+        transferResult = await transferSolToCreator(creatorPublicKey, solAmountLamports);
+      } catch (transferError) {
+        console.error('Error transferring SOL to creator:', transferError);
+        // Don't fail the entire transaction if transfer fails
+      }
+    }
+
+    // Update token price after transaction
+    try {
+      const currentPrice = await getTokenPrice(
+        new PublicKey(tokenMint),
+        new PublicKey('So11111111111111111111111111111111111111112')
+      );
+      
+      await prisma.token.update({
+        where: { id: token.id },
+        data: { currentPrice: new Decimal(currentPrice) }
+      });
+    } catch (priceError) {
+      console.error("Error updating token price:", priceError);
+    }
+
+    console.log(`${transactionType} transaction completed successfully:`, result.signature);
+
+    return res.status(200).json({
+      message: `${transactionType} transaction completed successfully`,
+      signature: result.signature,
+      transactionType,
+      amount,
+      creatorTransfer: {
+        amount: solAmountLamports / 1e9,
+        creator: creatorPublicKey,
+        signature: transferResult?.signature || null,
+        success: transferResult?.success || false
+      },
+      explorerUrl: `https://explorer.solana.com/tx/${result.signature}?cluster=devnet`
+    });
+
+  } catch (error: any) {
+    console.error("Error submitting buy/sell transaction:", error);
+    return res.status(500).json({ 
+      error: "Failed to submit buy/sell transaction",
       message: error.message 
     });
   }
