@@ -1,7 +1,7 @@
 "use client";
 import { motion } from 'framer-motion';
 import { useInView } from 'framer-motion';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Card } from '../../ui/Card';
 import { Star, Users, ArrowRight } from 'lucide-react';
 
@@ -23,6 +23,15 @@ interface CreatorsSectionProps {
 export const CreatorsSection = ({ creators }: CreatorsSectionProps) => {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const [selectedProfession, setSelectedProfession] = useState<string>('All');
+
+  // Get unique professions from creators data
+  const professions = ['All', ...Array.from(new Set(creators.map(creator => creator.profession)))];
+  
+  // Filter creators based on selected profession
+  const filteredCreators = selectedProfession === 'All' 
+    ? creators 
+    : creators.filter(creator => creator.profession === selectedProfession);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -57,7 +66,7 @@ export const CreatorsSection = ({ creators }: CreatorsSectionProps) => {
             variants={itemVariants}
             className="text-4xl md:text-6xl font-bold text-white mb-6"
           >
-            Featured <span className="text-secondary">Creators</span>
+            Explore <span className="text-secondary">Creators</span>
           </motion.h2>
           <motion.p
             variants={itemVariants}
@@ -66,19 +75,24 @@ export const CreatorsSection = ({ creators }: CreatorsSectionProps) => {
             Connect with top professionals and book their time for personalized sessions
           </motion.p>
           
-          {/* Filter Tabs */}
+          {/* Profession Filter Tabs - Linear Design */}
           <motion.div
             variants={itemVariants}
-            className="flex flex-wrap justify-center gap-4 mb-12"
+            className="flex flex-wrap justify-center gap-2 mb-12 overflow-x-auto scrollbar-hide"
           >
-            {['All', 'Developers', 'Designers', 'Marketers', 'Data Scientists'].map((category) => (
+            {professions.map((profession) => (
               <motion.button
-                key={category}
+                key={profession}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                className="px-6 py-3 rounded-full font-medium transition-all duration-300 bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+                onClick={() => setSelectedProfession(profession)}
+                className={`px-6 py-3 rounded-full font-medium transition-all duration-300 whitespace-nowrap ${
+                  selectedProfession === profession
+                    ? 'bg-secondary text-black'
+                    : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white'
+                }`}
               >
-                {category}
+                {profession}
               </motion.button>
             ))}
           </motion.div>
@@ -91,7 +105,7 @@ export const CreatorsSection = ({ creators }: CreatorsSectionProps) => {
           animate={isInView ? "visible" : "hidden"}
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12"
         >
-          {creators.map((creator) => (
+          {filteredCreators.map((creator) => (
             <motion.div
               key={creator.id}
               variants={itemVariants}
@@ -140,6 +154,18 @@ export const CreatorsSection = ({ creators }: CreatorsSectionProps) => {
               </div>
             </motion.div>
           ))}
+        </motion.div>
+
+        {/* Results Count */}
+        <motion.div
+          variants={itemVariants}
+          initial="hidden"
+          animate={isInView ? "visible" : "hidden"}
+          className="text-center mb-8"
+        >
+          <p className="text-gray-400 text-lg">
+            Showing {filteredCreators.length} {selectedProfession === 'All' ? 'creators' : `${selectedProfession.toLowerCase()}s`}
+          </p>
         </motion.div>
 
         {/* View All Button */}

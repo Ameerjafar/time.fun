@@ -26,7 +26,13 @@ export const WalletConnectButton = ({
   if (variant === 'compact') {
     return (
       <div className={`flex items-center space-x-2 ${className}`}>
-        <WalletMultiButton className="!bg-secondary/10 !text-secondary !border-secondary/20 hover:!bg-secondary/20 !rounded-lg !font-medium !justify-center !py-2 !px-4 !text-sm" />
+        {isClient ? (
+          <WalletMultiButton className="!bg-secondary/10 !text-secondary !border-secondary/20 hover:!bg-secondary/20 !rounded-lg !font-medium !justify-center !py-2 !px-4 !text-sm" />
+        ) : (
+          <div className="bg-secondary/10 text-secondary border border-secondary/20 rounded-lg font-medium justify-center py-2 px-4 text-sm h-9 flex items-center">
+            Select Wallet
+          </div>
+        )}
         {isClient && showStatus && connected && publicKey && (
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -45,13 +51,25 @@ export const WalletConnectButton = ({
 
   if (variant === 'minimal') {
     return (
-      <WalletMultiButton className={`!bg-transparent !text-secondary !border-secondary/30 hover:!bg-secondary/10 !rounded-lg !font-medium !justify-center !py-2 !px-3 !text-sm ${className}`} />
+      isClient ? (
+        <WalletMultiButton className={`!bg-transparent !text-secondary !border-secondary/30 hover:!bg-secondary/10 !rounded-lg !font-medium !justify-center !py-2 !px-3 !text-sm ${className}`} />
+      ) : (
+        <div className={`bg-transparent text-secondary border border-secondary/30 rounded-lg font-medium justify-center py-2 px-3 text-sm h-9 flex items-center ${className}`}>
+          Select Wallet
+        </div>
+      )
     );
   }
 
   return (
     <div className={`space-y-3 ${className}`}>
-      <WalletMultiButton className="!w-full !bg-secondary/10 !text-secondary !border-secondary/20 hover:!bg-secondary/20 !rounded-lg !font-medium !justify-center !py-3" />
+      {isClient ? (
+        <WalletMultiButton className="!w-full !bg-secondary/10 !text-secondary !border-secondary/20 hover:!bg-secondary/20 !rounded-lg !font-medium !justify-center !py-3" />
+      ) : (
+        <div className="w-full bg-secondary/10 text-secondary border border-secondary/20 rounded-lg font-medium justify-center py-3 h-12 flex items-center">
+          Select Wallet
+        </div>
+      )}
       
       {isClient && showStatus && connected && publicKey && (
         <motion.div

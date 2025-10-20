@@ -13,7 +13,7 @@ export const TwitterLogin = ({
   className = ''
 }: TwitterLoginProps) => {
   const [isLoading, setIsLoading] = useState(false);
-  const TWITTER_CLIENT_ID = process.env.NEXT_PUBLIC_TWITTER_CLIEND_ID!;
+  const TWITTER_CLIENT_ID = process.env.NEXT_PUBLIC_TWITTER_CLIENT_ID!;
   console.log("this is twitter client id", TWITTER_CLIENT_ID);
   function generateCodeVerifier(length = 128) {
     const characters =

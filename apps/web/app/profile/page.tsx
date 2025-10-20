@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useRouter } from 'next/navigation';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import axios from 'axios';
+import { createTokenWithWallet, isWalletConnected } from '../lib/solanaUtils';
 import { 
   User, 
   Wallet, 
@@ -27,14 +27,12 @@ import {
   Users,
   Video,
   TrendingUp,
-  Shield,
-  Mail,
-  Briefcase
+  Mail
 } from 'lucide-react';
 
 export default function ProfilePage() {
   const { user, login } = useAuth();
-  const { connected, publicKey, disconnect } = useWallet();
+  const { connected, publicKey, disconnect, wallet, signTransaction } = useWallet();
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [showTokenForm, setShowTokenForm] = useState(false);
@@ -66,6 +64,7 @@ export default function ProfilePage() {
   const [newSkill, setNewSkill] = useState('');
   const [copied, setCopied] = useState(false);
   const [isCreator, setIsCreator] = useState(false);
+  const [isCreatingToken, setIsCreatingToken] = useState(false);
 
   // Redirect if not authenticated
   // useEffect(() => {
@@ -204,15 +203,64 @@ export default function ProfilePage() {
       return;
     }
 
+    if (!user?.id) {
+      alert('User not authenticated');
+      return;
+    }
+
+    // Check if wallet is connected and ready
+    if (!isWalletConnected(connected, publicKey, signTransaction)) {
+      alert('Please connect your wallet to create a token');
+      return;
+    }
+
+    setIsCreatingToken(true);
+
     try {
-      // In production, call backend API to create token
-      console.log('Creating token:', tokenData);
-      alert(`Token ${tokenData.name} (${tokenData.symbol}) created successfully!`);
-      setShowTokenForm(false);
-      setIsCreator(true);
-    } catch (error) {
+      console.log('Creating token with wallet:', tokenData);
+      console.log('Wallet status:', { connected, publicKey: publicKey?.toBase58(), signTransaction: !!signTransaction });
+
+      const result = await createTokenWithWallet(
+        {
+          name: tokenData.name,
+          symbol: tokenData.symbol,
+          description: tokenData.description,
+          imageUrl: tokenData.image,
+          totalSupply: 1000000,
+          decimals: 9,
+          pricingModel: tokenData.pricingModel,
+          fixedPrice: tokenData.fixedPrice ? parseFloat(tokenData.fixedPrice) : undefined,
+          features: tokenData.features,
+          publicKey: publicKey?.toBase58() || ''
+        },
+        user.id,
+        wallet,
+        signTransaction
+      );
+
+      if (result.success && result.token) {
+        console.log('Token created successfully:', result.token);
+        
+        alert(`Token ${tokenData.name} (${tokenData.symbol}) created successfully!\\n\\nMint Address: ${result.token.mintAddress}\\nPool Address: ${result.token.poolAddress}\\nInitial Price: ${result.token.currentPrice} SOL\\n\\nView on Explorer: ${result.token.explorerUrl}`);
+        
+        setShowTokenForm(false);
+        setIsCreator(true);
+        
+        // Redirect to creator page
+        router.push(`/creator/${user.id}`);
+      } else {
+        throw new Error(result.error || 'Failed to create token');
+      }
+    } catch (error: any) {
       console.error('Error creating token:', error);
-      alert('Failed to create token');
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      alert(`Error: ${error.message || 'Failed to create token'}`);
+    } finally {
+      setIsCreatingToken(false);
     }
   };
 
@@ -392,6 +440,27 @@ export default function ProfilePage() {
                 </button>
               </div>
 
+              {/* Wallet Connection Status */}
+              {!isWalletConnected(connected, publicKey, signTransaction) && (
+                <div className="mb-6 p-4 bg-yellow-900/20 border border-yellow-500/30 rounded-lg">
+                  <div className="flex items-center space-x-3">
+                    <Wallet className="w-5 h-5 text-yellow-400" />
+                    <div>
+                      <p className="text-yellow-400 font-medium">Wallet Not Connected</p>
+                      <p className="text-yellow-300/80 text-sm">Please connect your wallet to create a token</p>
+                      <p className="text-yellow-300/60 text-xs mt-1">
+                        Debug: connected={connected ? 'true' : 'false'}, 
+                        publicKey={publicKey ? 'exists' : 'null'}, 
+                        signTransaction={signTransaction ? 'exists' : 'null'}
+                      </p>
+                    </div>
+                    <div className="ml-auto">
+                      <WalletMultiButton className="!bg-secondary !text-black hover:!bg-green-400" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <form onSubmit={handleTokenSubmit} className="space-y-6">
                 <div className="grid md:grid-cols-2 gap-6">
                   <div>
@@ -536,9 +605,17 @@ export default function ProfilePage() {
 
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-secondary to-green-400 text-black font-bold py-4 text-lg rounded-lg hover:shadow-2xl transition-all"
+                  disabled={isCreatingToken}
+                  className="w-full bg-gradient-to-r from-secondary to-green-400 text-black font-bold py-4 text-lg rounded-lg hover:shadow-2xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Create Token
+                  {isCreatingToken ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                      <span>Creating Token...</span>
+                    </div>
+                  ) : (
+                    'Create Token'
+                  )}
                 </button>
               </form>
             </motion.div>

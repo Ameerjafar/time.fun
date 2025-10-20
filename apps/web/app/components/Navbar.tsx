@@ -19,12 +19,12 @@ export const Navbar = () => {
   const { connected, publicKey } = useWallet();
   const userMenuRef = useRef<HTMLDivElement>(null);
   const navigator = useRouter();
-  const sumbitHandler = async () => {
-    navigator.push('/auth/signin');
+  const handleLoginClick = () => {
+    setIsLoginModalOpen(true);
   }
 
   const handleTwitterConnect = async () => {
-    const TWITTER_CLIENT_ID = process.env.NEXT_PUBLIC_TWITTER_CLIEND_ID!;
+    const TWITTER_CLIENT_ID = process.env.NEXT_PUBLIC_TWITTER_CLIENT_ID!;
     
     if (!TWITTER_CLIENT_ID) {
       console.error('Twitter Client ID not found');
@@ -224,7 +224,12 @@ export const Navbar = () => {
             ) : (
               <>
                 <WalletConnectButton variant="compact" />
-                <button onClick = { sumbitHandler }>Login</button>
+                <button 
+                  onClick={handleLoginClick}
+                  className="bg-secondary text-black px-6 py-2 rounded-lg font-bold hover:bg-secondary/90 transition-colors"
+                >
+                  Login
+                </button>
               </>
             )}
           </div>

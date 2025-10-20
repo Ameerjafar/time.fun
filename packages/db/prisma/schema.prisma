@@ -51,14 +51,20 @@ model UserHoldToken {
 }
 
 model Token {
-  id          String  @id @default(uuid())
-  name        String
-  symbol      String
-  totalSupply Int
-  description String?
-  imageUrl    String
-  userId      String  @unique
-  user        User    @relation(fields: [userId], references: [id])
+  id           String   @id @default(uuid())
+  name         String
+  symbol       String
+  totalSupply  Int
+  description  String?
+  imageUrl     String
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id])
+  mintAddress  String?  @unique
+  poolAddress  String?  @unique
+  currentPrice Decimal? @default(0)
+  initialPrice Decimal? @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 model PricingModel {
