@@ -19,12 +19,17 @@ const TwitterHandler = () => {
     useEffect(() => {
         const handleTwitterCallback = async () => {
             if (!accessCode) {
+                console.log(1);
                 setStatus('error');
                 setMessage('No authorization code received');
                 return;
             }
 
             try {
+
+                if (sessionStorage.getItem('isTwitterConnected') === "true"){
+                    return
+                }
                 const codeVerifier = sessionStorage.getItem("code_verifier");
                 if (!codeVerifier) {
                     setStatus('error');
@@ -36,12 +41,12 @@ const TwitterHandler = () => {
                     `http://localhost:5000/auth/twitter/callback?code=${accessCode}`, 
                     { codeVerifier }
                 );
-
+                
                 if (response.data.user) {
                     const userData = response.data.user;
                     setUserName(userData.name || response.data.twitterName);
                     setStatus('success');
-                    setMessage('Successfully logged in with Twitter!');
+                    setMessage('Successfully logged in with Twitter!');                    
                     
                     // Login the user with full data
                     login({
@@ -53,13 +58,15 @@ const TwitterHandler = () => {
                         isTwitterConnected: true,
                     });
 
+                    sessionStorage.setItem('isTwitterConnected',"true")
+
                     // Clear the code verifier
                     sessionStorage.removeItem("code_verifier");
 
                     // Redirect to home page after 2 seconds
                     setTimeout(() => {
                         router.push('/');
-                    }, 2000);
+                    }, 200);
                 } else {
                     setStatus('error');
                     setMessage('Failed to get user information');
@@ -74,9 +81,8 @@ const TwitterHandler = () => {
                 setMessage(errorMsg);
             }
         };
-
         handleTwitterCallback();
-    }, [accessCode, login, router]);
+    }, [router]);
 
     return (
         <div className="min-h-screen bg-black flex items-center justify-center p-4">

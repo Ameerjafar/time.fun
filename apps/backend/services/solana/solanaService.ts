@@ -8,7 +8,7 @@ import {
   TransactionInstruction,
 } from "@solana/web3.js";
 import bs58 from "bs58";
-import idl from "../../../../contracts/bonding_curve/target/idl/bonding_curve.json";
+// import idl from "../../../../contracts/bonding_curve/target/idl/bonding_curve.json";
 
 import {
   TOKEN_PROGRAM_ID,
@@ -269,93 +269,93 @@ export async function submitSignedTransaction(
   }
 }
 
-export async function initializePool(params: PoolInitParams) {
-  const connection = new Connection(DEVNET_RPC, "confirmed");
-  const payer = params.creatorKeypair ?? getOrCreatePayer();
-  const wallet = new anchor.Wallet(payer);
-  const provider = new anchor.AnchorProvider(connection, wallet, {
-    preflightCommitment: "confirmed",
-  });
-  anchor.setProvider(provider);
+// export async function initializePool(params: PoolInitParams) {
+//   const connection = new Connection(DEVNET_RPC, "confirmed");
+//   const payer = params.creatorKeypair ?? getOrCreatePayer();
+//   const wallet = new anchor.Wallet(payer);
+//   const provider = new anchor.AnchorProvider(connection, wallet, {
+//     preflightCommitment: "confirmed",
+//   });
+//   anchor.setProvider(provider);
 
-  const program = new (anchor as any).Program(idl as any, new PublicKey(process.env.PROGRAM_ID!), provider as any);
-  const [poolPDA] = await PublicKey.findProgramAddress(
-    [Buffer.from("pool"), params.solMint.toBuffer(), params.tokenMint.toBuffer()],
-    PROGRAM_ID
-  );
-  const accountInfo = await connection.getAccountInfo(poolPDA);
-  if (accountInfo) {
-    console.log("✅ Pool already exists at:", poolPDA.toBase58());
-    const existingPrice = await getTokenPrice(params.tokenMint, params.solMint);
-    return {
-      poolAddress: poolPDA.toBase58(),
-      signature: "",
-      tokenPrice: existingPrice,
-      alreadyExists: true,
-    };
-  }
+//   const program = new (anchor as any).Program(idl as any, new PublicKey(process.env.PROGRAM_ID!), provider as any);
+//   const [poolPDA] = await PublicKey.findProgramAddress(
+//     [Buffer.from("pool"), params.solMint.toBuffer(), params.tokenMint.toBuffer()],
+//     PROGRAM_ID
+//   );
+//   const accountInfo = await connection.getAccountInfo(poolPDA);
+//   if (accountInfo) {
+//     console.log("✅ Pool already exists at:", poolPDA.toBase58());
+//     const existingPrice = await getTokenPrice(params.tokenMint, params.solMint);
+//     return {
+//       poolAddress: poolPDA.toBase58(),
+//       signature: "",
+//       tokenPrice: existingPrice,
+//       alreadyExists: true,
+//     };
+//   }
 
-  console.log("🚀 Initializing new pool:", poolPDA.toBase58());
-  const userTokenXAccount = await getOrCreateAssociatedTokenAccount(
-    connection,
-    payer,
-    params.solMint,
-    payer.publicKey
-  );
-  const userTokenYAccount = await getOrCreateAssociatedTokenAccount(
-    connection,
-    payer,
-    params.tokenMint,
-    payer.publicKey
-  );
+//   console.log("🚀 Initializing new pool:", poolPDA.toBase58());
+//   const userTokenXAccount = await getOrCreateAssociatedTokenAccount(
+//     connection,
+//     payer,
+//     params.solMint,
+//     payer.publicKey
+//   );
+//   const userTokenYAccount = await getOrCreateAssociatedTokenAccount(
+//     connection,
+//     payer,
+//     params.tokenMint,
+//     payer.publicKey
+//   );
 
-  const poolTokenXAccount = await getOrCreateAssociatedTokenAccount(
-    connection,
-    payer,
-    params.solMint,
-    poolPDA,
-    true // allowOwnerOffCurve for PDA
-  );
-  const poolTokenYAccount = await getOrCreateAssociatedTokenAccount(
-    connection,
-    payer,
-    params.tokenMint,
-    poolPDA,
-    true
-  );
+//   const poolTokenXAccount = await getOrCreateAssociatedTokenAccount(
+//     connection,
+//     payer,
+//     params.solMint,
+//     poolPDA,
+//     true // allowOwnerOffCurve for PDA
+//   );
+//   const poolTokenYAccount = await getOrCreateAssociatedTokenAccount(
+//     connection,
+//     payer,
+//     params.tokenMint,
+//     poolPDA,
+//     true
+//   );
 
-  // ✅ Call the Anchor initialize instruction
-  const txSig = await (program as any).methods
-    .initialize(new anchor.BN(params.initialSol), new anchor.BN(params.initialToken))
-    .accounts({
-      tokenXMint: params.solMint,
-      tokenYMint: params.tokenMint,
-      pool: poolPDA,
-      user: payer.publicKey,
-      userTokenXAccount: userTokenXAccount.address,
-      userTokenYAccount: userTokenYAccount.address,
-      poolTokenXAccount: poolTokenXAccount.address,
-      poolTokenYAccount: poolTokenYAccount.address,
-      tokenProgram: TOKEN_PROGRAM_ID,
-      systemProgram: SystemProgram.programId,
-      rent: anchor.web3.SYSVAR_RENT_PUBKEY,
-    })
-    .signers([payer])
-    .rpc();
+//   // ✅ Call the Anchor initialize instruction
+//   const txSig = await (program as any).methods
+//     .initialize(new anchor.BN(params.initialSol), new anchor.BN(params.initialToken))
+//     .accounts({
+//       tokenXMint: params.solMint,
+//       tokenYMint: params.tokenMint,
+//       pool: poolPDA,
+//       user: payer.publicKey,
+//       userTokenXAccount: userTokenXAccount.address,
+//       userTokenYAccount: userTokenYAccount.address,
+//       poolTokenXAccount: poolTokenXAccount.address,
+//       poolTokenYAccount: poolTokenYAccount.address,
+//       tokenProgram: TOKEN_PROGRAM_ID,
+//       systemProgram: SystemProgram.programId,
+//       rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+//     })
+//     .signers([payer])
+//     .rpc();
 
-  const tokenPrice = params.initialSol / params.initialToken;
+//   const tokenPrice = params.initialSol / params.initialToken;
 
-  console.log("✅ Pool initialized successfully!");
-  console.log("Pool PDA:", poolPDA.toBase58());
-  console.log("Transaction Signature:", txSig);
+//   console.log("✅ Pool initialized successfully!");
+//   console.log("Pool PDA:", poolPDA.toBase58());
+//   console.log("Transaction Signature:", txSig);
 
-  return {
-    poolAddress: poolPDA.toBase58(),
-    signature: txSig,
-    tokenPrice,
-    alreadyExists: false,
-  };
-}
+//   return {
+//     poolAddress: poolPDA.toBase58(),
+//     signature: txSig,
+//     tokenPrice,
+//     alreadyExists: false,
+//   };
+// }
 export async function getTokenPrice(
   tokenMint: PublicKey,
   solMint: PublicKey
@@ -403,56 +403,56 @@ export async function getTokenPrice(
   }
 }
 
-export async function createTokenWithPoolTransaction(
-  tokenParams: TokenCreationParams,
-  initialSol: number = 1,
-  initialTokenSupply: number = 10000,
-): Promise<{
-  transactionData: TransactionData;
-  poolAddress: string;
-  tokenPrice: number;
-}> {
-  try {
-    const creatorPublicKey = tokenParams.publicKey;
-    console.log("Creating token transaction with params:", tokenParams);
-    const transactionData = await createTokenTransaction(tokenParams);
-    console.log(
-      "Token transaction prepared successfully:",
-      transactionData.mintAddress
-    );
-    const creatorKeypair = getOrCreatePayer();
-    const solMint = new PublicKey(
-      "So11111111111111111111111111111111111111112"
-    ); 
+// export async function createTokenWithPoolTransaction(
+//   tokenParams: TokenCreationParams,
+//   initialSol: number = 1,
+//   initialTokenSupply: number = 10000,
+// ): Promise<{
+//   transactionData: TransactionData;
+//   poolAddress: string;
+//   tokenPrice: number;
+// }> {
+//   try {
+//     const creatorPublicKey = tokenParams.publicKey;
+//     console.log("Creating token transaction with params:", tokenParams);
+//     const transactionData = await createTokenTransaction(tokenParams);
+//     console.log(
+//       "Token transaction prepared successfully:",
+//       transactionData.mintAddress
+//     );
+//     const creatorKeypair = getOrCreatePayer();
+//     const solMint = new PublicKey(
+//       "So11111111111111111111111111111111111111112"
+//     ); 
 
-    const normalizedInitialSol: number = Number(initialSol ?? 1);
-    const normalizedInitialToken: number = Number(initialTokenSupply ?? 10000);
+//     const normalizedInitialSol: number = Number(initialSol ?? 1);
+//     const normalizedInitialToken: number = Number(initialTokenSupply ?? 10000);
 
-    const {
-      poolAddress,
-      signature: poolSig,
-      tokenPrice,
-    } = await initializePool({
-      tokenMint: new PublicKey(transactionData.mintAddress),
-      solMint,
-      initialSol: normalizedInitialSol,
-      initialToken: normalizedInitialToken,
-      creatorKeypair,
-    });
+//     const {
+//       poolAddress,
+//       signature: poolSig,
+//       tokenPrice,
+//     } = await initializePool({
+//       tokenMint: new PublicKey(transactionData.mintAddress),
+//       solMint,
+//       initialSol: normalizedInitialSol,
+//       initialToken: normalizedInitialToken,
+//       creatorKeypair,
+//     });
 
-    console.log("Pool address derived:", poolAddress);
-    console.log("Initial token price:", tokenPrice, "SOL");
+//     console.log("Pool address derived:", poolAddress);
+//     console.log("Initial token price:", tokenPrice, "SOL");
 
-    return {
-      transactionData,
-      poolAddress,
-      tokenPrice: tokenPrice ?? 0.000001,
-    };
-  } catch (error) {
-    console.error("Error in createTokenWithPoolTransaction:", error);
-    throw error;
-  }
-}
+//     return {
+//       transactionData,
+//       poolAddress,
+//       tokenPrice: tokenPrice ?? 0.000001,
+//     };
+//   } catch (error) {
+//     console.error("Error in createTokenWithPoolTransaction:", error);
+//     throw error;
+//   }
+// }
 
 export interface BuyTokenParams {
   tokenMint: string;
