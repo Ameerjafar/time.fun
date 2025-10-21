@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { TwitterLogin } from './TwitterLogin';
 import { WalletConnectButton } from './WalletConnectButton';
 import { X } from 'lucide-react';
-
+ 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;

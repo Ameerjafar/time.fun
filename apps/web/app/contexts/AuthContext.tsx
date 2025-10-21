@@ -62,6 +62,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const logout = () => {
     setUser(null);
     localStorage.removeItem('timefun_user');
+    sessionStorage.removeItem('isTwitterConnected');
   };
 
   return (
