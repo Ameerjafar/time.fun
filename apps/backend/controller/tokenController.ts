@@ -64,8 +64,6 @@ const submitBuySellTransactionSchema = z.object({
 export const createToken = async (req: Request, res: Response) => {
   try {
     console.log("Creating token transaction with data:", req.body);
-
-    // Validate request body
     const parseResult = createTokenSchema.safeParse(req.body);
     
     if (!parseResult.success) {
@@ -76,10 +74,6 @@ export const createToken = async (req: Request, res: Response) => {
     }
 
     const validatedData = parseResult.data;
-
-    // Note: We do not validate user existence or token uniqueness here.
-    // Transaction preparation should not be blocked by backend user state.
-
     console.log("Creating token transaction on Solana devnet...");
     const blockchainResult = await createTokenWithPoolTransaction(
       {

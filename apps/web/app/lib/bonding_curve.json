@@ -36,20 +36,11 @@
               },
               {
                 "kind": "account",
-                "path": "pool.token_x_mint",
-                "account": "PoolState"
-              },
-              {
-                "kind": "account",
-                "path": "pool.token_y_mint",
+                "path": "pool.token_mint",
                 "account": "PoolState"
               }
             ]
           }
-        },
-        {
-          "name": "pool_sol_account",
-          "writable": true
         },
         {
           "name": "pool_token_account",
@@ -94,11 +85,7 @@
       ],
       "accounts": [
         {
-          "name": "token_x_mint",
-          "writable": true
-        },
-        {
-          "name": "token_y_mint",
+          "name": "token_mint",
           "writable": true
         },
         {
@@ -117,11 +104,7 @@
               },
               {
                 "kind": "account",
-                "path": "token_x_mint"
-              },
-              {
-                "kind": "account",
-                "path": "token_y_mint"
+                "path": "token_mint"
               }
             ]
           }
@@ -132,19 +115,11 @@
           "signer": true
         },
         {
-          "name": "user_token_x_account",
+          "name": "user_token_account",
           "writable": true
         },
         {
-          "name": "user_token_y_account",
-          "writable": true
-        },
-        {
-          "name": "pool_token_x_account",
-          "writable": true
-        },
-        {
-          "name": "pool_token_y_account",
+          "name": "pool_token_account",
           "writable": true
         },
         {
@@ -200,20 +175,11 @@
               },
               {
                 "kind": "account",
-                "path": "pool.token_x_mint",
-                "account": "PoolState"
-              },
-              {
-                "kind": "account",
-                "path": "pool.token_y_mint",
+                "path": "pool.token_mint",
                 "account": "PoolState"
               }
             ]
           }
-        },
-        {
-          "name": "pool_sol_account",
-          "writable": true
         },
         {
           "name": "pool_token_account",
@@ -265,6 +231,11 @@
       "code": 6000,
       "name": "NotEnoughTokensInPool",
       "msg": "Not enough tokens in the pool"
+    },
+    {
+      "code": 6001,
+      "name": "NotEnoughSolInPool",
+      "msg": "Not enough SOL in the pool"
     }
   ],
   "types": [
@@ -274,24 +245,24 @@
         "kind": "struct",
         "fields": [
           {
-            "name": "reserve_x",
+            "name": "reserve_sol",
             "type": "u64"
           },
           {
-            "name": "reserve_y",
+            "name": "reserve_token",
             "type": "u64"
           },
           {
-            "name": "token_x_mint",
-            "type": "pubkey"
-          },
-          {
-            "name": "token_y_mint",
+            "name": "token_mint",
             "type": "pubkey"
           },
           {
             "name": "constant_k",
             "type": "u128"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
           }
         ]
       }

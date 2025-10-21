@@ -1,10 +1,10 @@
-import { Transaction, PublicKey, SystemProgram, Connection, Keypair,   TransactionInstruction } from '@solana/web3.js';
+import { Transaction, PublicKey, SystemProgram, Connection, Keypair, TransactionInstruction } from '@solana/web3.js';
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID, createAssociatedTokenAccountInstruction, createInitializeMintInstruction, createMintToInstruction } from '@solana/spl-token';
 import { Program, AnchorProvider, Wallet, BN } from '@coral-xyz/anchor';
 import idl from './bonding_curve.json';
 
 export interface TransactionData {
-  transaction: string; // Base64 encoded transaction
+  transaction: string;
   mintAddress: string;
   tokenAccountAddress: string;
   instructions: Array<{
@@ -47,14 +47,9 @@ export async function signAndSubmitTransaction(
       throw new Error('Wallet not connected or does not support transaction signing');
     }
 
-    // Deserialize the transaction
     const transactionBuffer = Buffer.from(transactionData.transaction, 'base64');
     const transaction = Transaction.from(transactionBuffer);
-
-    // Sign the transaction with the wallet
     const signedTransaction = await wallet.signTransaction(transaction);
-
-    // Serialize the signed transaction
     const signedTransactionBuffer = signedTransaction.serialize();
     const signedTransactionBase64 = signedTransactionBuffer.toString('base64');
 
@@ -70,7 +65,6 @@ export async function signAndSubmitTransaction(
 
 /**
  * Build a mint creation transaction on the client and partially sign with the generated mint keypair.
- * The returned Transaction must be signed by the connected wallet before sending.
  */
 export async function buildMintCreationTransaction(
   connection: Connection,
@@ -123,7 +117,6 @@ export async function buildMintCreationTransaction(
     mintToIx
   );
 
-  // Partial sign with the newly generated mint keypair
   transaction.partialSign(mintKeypair);
 
   return { transaction, mintKeypair, mintAddress, tokenAccountAddress };
@@ -152,17 +145,19 @@ export async function createMintOnFrontend(
   const raw = signed.serialize();
   const signature = await connection.sendRawTransaction(raw, { skipPreflight: false });
   await connection.confirmTransaction(signature, 'confirmed');
-  console.log("confirm the mint creation successfully")
+  console.log("✅ Mint created successfully");
   return { signature, mintAddress: mintAddress.toBase58(), tokenAccountAddress: tokenAccountAddress.toBase58() };
 }
 
-
+/**
+ * Initialize pool with NATIVE SOL (no wrapped SOL needed!)
+ */
 export async function initializePoolOnFrontend(
   connection: Connection,
   wallet: { signTransaction: (tx: Transaction) => Promise<Transaction>; publicKey: PublicKey },
-  params: { tokenMint: string; solMint?: string; initialSol: number; initialToken: number; programId: string },
+  params: { tokenMint: string; initialSol: number; initialToken: number; programId: string },
 ): Promise<{ poolAddress: string; signature: string; tokenPrice: number }> {
-  console.log("🚀 Initializing pool...");
+  console.log("🚀 Initializing pool with native SOL...");
 
   if (!wallet?.signTransaction || !wallet?.publicKey) {
     throw new Error('Wallet not connected');
@@ -170,62 +165,36 @@ export async function initializePoolOnFrontend(
 
   const userPublicKey = wallet.publicKey;
   const tokenMint = new PublicKey(params.tokenMint);
-  const solMint = new PublicKey(params.solMint || 'So11111111111111111111111111111111111111112');
   const PROGRAM_ID = new PublicKey(params.programId);
 
   // Create Anchor provider and program
   const provider = new AnchorProvider(connection, wallet as Wallet, { preflightCommitment: 'confirmed' });
-  
-  // Fix: Pass PROGRAM_ID as second parameter
   const program = new Program(idl as any, provider);
   
-  // Debug: Check if program is properly initialized
   console.log("Program ID:", PROGRAM_ID.toBase58());
-  console.log("Program methods:", Object.keys(program.methods || {}));
   
   if (!program.methods || !program.methods.initialize) {
     throw new Error('Program not properly initialized or initialize method not found in IDL');
   }
 
-  // Derive pool PDA
-  const [poolPDA, poolBump] = PublicKey.findProgramAddressSync(
-    [Buffer.from('pool'), solMint.toBuffer(), tokenMint.toBuffer()],
+  // Derive pool PDA - NOW ONLY USES TOKEN MINT (no SOL mint needed!)
+  const [poolPDA] = PublicKey.findProgramAddressSync(
+    [Buffer.from('pool'), tokenMint.toBuffer()],
     PROGRAM_ID
   );
 
-  // Get associated token accounts
-  const userSolAccount = await getAssociatedTokenAddress(solMint, userPublicKey);
+  console.log("Pool PDA:", poolPDA.toBase58());
+
+  // Get user's token account
   const userTokenAccount = await getAssociatedTokenAddress(tokenMint, userPublicKey);
-  const poolSolAccount = await getAssociatedTokenAddress(solMint, poolPDA, true);
+  
+  // Get pool's token account (owned by pool PDA)
   const poolTokenAccount = await getAssociatedTokenAddress(tokenMint, poolPDA, true);
 
-  console.log("User & Pool token accounts derived");
+  console.log("User token account:", userTokenAccount.toBase58());
+  console.log("Pool token account:", poolTokenAccount.toBase58());
 
   const instructions: TransactionInstruction[] = [];
-
-  // Check and create user SOL account if needed
-  const userSolAccountInfo = await connection.getAccountInfo(userSolAccount);
-  if (!userSolAccountInfo) {
-    console.log("Creating user SOL token account...");
-    instructions.push(createAssociatedTokenAccountInstruction(
-      userPublicKey,
-      userSolAccount,
-      userPublicKey,
-      solMint
-    ));
-  }
-
-  // Check and create pool SOL account if needed
-  const poolSolAccountInfo = await connection.getAccountInfo(poolSolAccount);
-  if (!poolSolAccountInfo) {
-    console.log("Creating pool SOL token account...");
-    instructions.push(createAssociatedTokenAccountInstruction(
-      userPublicKey, // payer
-      poolSolAccount,
-      poolPDA, // owner = PDA
-      solMint
-    ));
-  }
 
   // Check and create user token account if needed
   const userTokenAccountInfo = await connection.getAccountInfo(userTokenAccount);
@@ -251,53 +220,95 @@ export async function initializePoolOnFrontend(
     ));
   }
 
-  // Send all account creation instructions in a single transaction
+  // Send all account creation instructions if needed
   if (instructions.length > 0) {
-    const { blockhash } = await connection.getLatestBlockhash('confirmed');
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
     const tx = new Transaction({ recentBlockhash: blockhash, feePayer: userPublicKey });
     tx.add(...instructions);
     const signedTx = await wallet.signTransaction(tx);
-    const signature = await connection.sendRawTransaction(signedTx.serialize(), { skipPreflight: false });
-    await connection.confirmTransaction(signature, 'confirmed');
-    console.log("✅ Accounts created, tx:", signature);
+    const signature = await connection.sendRawTransaction(signedTx.serialize(), { 
+      skipPreflight: false,
+      maxRetries: 3 
+    });
+    await connection.confirmTransaction({
+      signature,
+      blockhash,
+      lastValidBlockHeight
+    }, 'confirmed');
+    console.log("✅ Token accounts created, tx:", signature);
+    
+    // Wait a bit for accounts to be fully available
+    await new Promise(resolve => setTimeout(resolve, 1000));
   }
 
-  // Call Anchor initialize method
+  // Check if pool already exists
+  const poolInfo = await connection.getAccountInfo(poolPDA);
+  if (poolInfo) {
+    console.log("⚠️ Pool already exists at:", poolPDA.toBase58());
+    throw new Error(`Pool already exists for this token. Pool address: ${poolPDA.toBase58()}`);
+  }
+
+  // Call Anchor initialize method with NATIVE SOL
   try {
     console.log("Initializing pool on-chain...");
+    console.log("Initial SOL:", params.initialSol);
+    console.log("Initial Token:", params.initialToken);
+    console.log("Pool PDA:", poolPDA.toBase58());
     
-    // Verify the initialize method exists
-    if (!program.methods.initialize) {
-      console.error("Available methods:", Object.keys(program.methods));
-      throw new Error("Initialize method not found. Check your IDL.");
-    }
+    // Get fresh blockhash
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
     
     const tx = await program.methods
-      .initialize(new BN(params.initialSol), new BN(params.initialToken), poolBump)
+      .initialize(
+        new BN(params.initialSol), 
+        new BN(params.initialToken)
+      )
       .accounts({
-        tokenXMint: solMint,
-        tokenYMint: tokenMint,
-        pool: poolPDA,
-        user: userPublicKey,
-        userTokenXAccount: userSolAccount,
-        userTokenYAccount: userTokenAccount,
-        poolTokenXAccount: poolSolAccount,
-        poolTokenYAccount: poolTokenAccount,
+        tokenMint: tokenMint,              // Only one mint (your custom token)
+        pool: poolPDA,                     // Pool PDA (holds native SOL)
+        user: userPublicKey,               // Your wallet
+        userTokenAccount: userTokenAccount, // Your token account
+        poolTokenAccount: poolTokenAccount, // Pool's token account
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
         rent: new PublicKey('SysvarRent111111111111111111111111111111111'),
       })
-      .rpc();
+      .preInstructions([
+        // Add compute budget to avoid issues
+        {
+          programId: new PublicKey('ComputeBudget111111111111111111111111111111'),
+          keys: [],
+          data: Buffer.from([0x00, 0x00, 0x40, 0x0d, 0x03, 0x00, 0x00, 0x00, 0x00])
+        }
+      ])
+      .rpc({ skipPreflight: false });
+    
+    // Wait for confirmation
+    await connection.confirmTransaction({
+      signature: tx,
+      blockhash,
+      lastValidBlockHeight
+    }, 'confirmed');
     
     const tokenPrice = params.initialSol / params.initialToken;
     console.log("✅ Pool initialized:", poolPDA.toBase58());
+    console.log("✅ Token price:", tokenPrice, "lamports per token");
+    console.log("✅ Transaction:", tx);
+    
     return { poolAddress: poolPDA.toBase58(), signature: tx, tokenPrice };
   } catch (error: any) {
-    console.error("Pool initialization error:", error);
+    console.error("❌ Pool initialization error:", error);
     if (error.logs) console.error("Transaction logs:", error.logs);
+    
+    // Check if it's a duplicate transaction error
+    if (error.message?.includes('already been processed')) {
+      throw new Error('Transaction already processed. The pool may have been created. Please refresh and check.');
+    }
+    
     throw error;
   }
 }
+
 /**
  * High-level helper to create mint and then initialize pool on the client.
  */
@@ -308,16 +319,22 @@ export async function createTokenAndPoolFrontend(
   poolParams: { programId: string; initialSol: number; initialToken: number }
 ): Promise<{ mintAddress: string; poolAddress: string; tokenPrice: number; txSignatures: { mint: string; pool: string } }>
 {
-  console.log("creating mint adderss")
+  console.log("Creating mint address...");
   const mintResult = await createMintOnFrontend(connection, wallet, tokenParams);
-  console.log("creating pool address")
+  
+  // Wait a bit for the mint transaction to fully settle
+  console.log("Waiting for mint confirmation...");
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  
+  console.log("Creating pool with native SOL...");
   const poolResult = await initializePoolOnFrontend(connection, wallet, {
     tokenMint: mintResult.mintAddress,
     initialSol: poolParams.initialSol,
     initialToken: poolParams.initialToken,
     programId: poolParams.programId,
   });
-  console.log("returning mint and pool address")
+  
+  console.log("✅ Mint and pool created successfully!");
   return {
     mintAddress: mintResult.mintAddress,
     poolAddress: poolResult.poolAddress,
@@ -338,30 +355,30 @@ export async function createTokenWithWallet(
 ): Promise<{ success: boolean; token?: any; error?: string }> {
   try {
     console.log('Creating token with params:', { ...tokenParams, userId });
-    console.log('Wallet object:', wallet);
-    console.log('SignTransaction function:', !!signTransaction);
-    console.log('TokenParams publicKey:', tokenParams.publicKey);
     
-    // Check if we have the necessary wallet functions
     if (!signTransaction) {
       throw new Error('Wallet signTransaction function not available');
     }
 
-    // Get public key from wallet or tokenParams
     const walletPublicKey = wallet?.publicKey || tokenParams.publicKey;
     console.log('Using public key:', walletPublicKey);
+    
     if (!walletPublicKey) {
       throw new Error('Wallet public key not available');
     }
 
-    // Create a wallet-like object for Anchor
     const walletForAnchor = {
       publicKey: new PublicKey(walletPublicKey),
       signTransaction: signTransaction
     };
 
-    // Handle blockchain operations on frontend
-    console.log('Creating mint and pool on frontend...');
+    console.log('Creating mint and pool on frontend with native SOL...');
+    
+    // Calculate initial SOL amount in lamports
+    const initialSolLamports = tokenParams.pricingModel === 'fixed' 
+      ? (tokenParams.fixedPrice || 0.001) * tokenParams.totalSupply * 1_000_000_000 // Convert SOL to lamports
+      : 1_000_000; // 0.001 SOL default
+    
     const result = await createTokenAndPoolFrontend(
       connection,
       walletForAnchor,
@@ -370,13 +387,13 @@ export async function createTokenWithWallet(
         decimals: tokenParams.decimals
       },
       {
-        programId: 'EJGrTzirrsJ2ukMdomaXrR31GcHpFckqqir6dqyZEx5S', // Bonding curve program ID
-        initialSol: tokenParams.pricingModel === 'fixed' ? (tokenParams.fixedPrice || 0) * tokenParams.totalSupply : 1000000, // 0.001 SOL default
-        initialToken: tokenParams.totalSupply
+        programId: 'EJGrTzirrsJ2ukMdomaXrR31GcHpFckqqir6dqyZEx5S',
+        initialSol: initialSolLamports,
+        initialToken: tokenParams.totalSupply * Math.pow(10, tokenParams.decimals) // In base units
       }
     );
 
-    console.log('Blockchain operations completed:', {
+    console.log('✅ Blockchain operations completed:', {
       mintAddress: result.mintAddress,
       poolAddress: result.poolAddress,
       tokenPrice: result.tokenPrice
@@ -411,7 +428,7 @@ export async function createTokenWithWallet(
     };
 
   } catch (error: any) {
-    console.error('Error creating token:', error);
+    console.error('❌ Error creating token:', error);
     return {
       success: false,
       error: error.message || 'Failed to create token'
