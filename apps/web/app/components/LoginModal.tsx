@@ -2,7 +2,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { TwitterLogin } from './TwitterLogin';
 import { WalletConnectButton } from './WalletConnectButton';
-import { X, Wallet, Twitter } from 'lucide-react';
+import { X } from 'lucide-react';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -21,7 +21,7 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+          className="inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
           onClick={handleClose}
         >
           <motion.div
@@ -54,22 +54,14 @@ export const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
                 Choose how you&apos;d like to connect to Time.fun
               </p>
               
-              <div className="space-y-4">
+              <div className="space-y-4 flex flex-row gap-3">
                 {/* Wallet Connection */}
                 <div className="space-y-3">
-                  <div className="flex items-center space-x-3 text-secondary">
-                    <Wallet className="w-5 h-5" />
-                    <span className="font-medium">Connect Wallet</span>
-                  </div>
                   <WalletConnectButton variant="default" />
                 </div>
                 
                 {/* Twitter Connection */}
-                <div className="space-y-3">
-                  <div className="flex items-center space-x-3 text-[#1DA1F2]">
-                    <Twitter className="w-5 h-5" />
-                    <span className="font-medium">Login with Twitter</span>
-                  </div>
+                <div className="space-y-3 !mt-0">
                   <TwitterLogin variant="default" />
                 </div>
               </div>

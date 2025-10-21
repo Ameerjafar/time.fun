@@ -2,7 +2,7 @@ import { Request, Response } from "express";
 import { prisma } from "@repo/db";
 import { PublicKey } from "@solana/web3.js";
 import { 
-  createTokenWithPoolTransaction, 
+  // createTokenWithPoolTransaction, 
   submitSignedTransaction, 
   getTokenPrice,
   createBuyTokenTransaction,
@@ -75,39 +75,39 @@ export const createToken = async (req: Request, res: Response) => {
 
     const validatedData = parseResult.data;
     console.log("Creating token transaction on Solana devnet...");
-    const blockchainResult = await createTokenWithPoolTransaction(
-      {
-        name: validatedData.name,
-        symbol: validatedData.symbol,
-        decimals: validatedData.decimals,
-        totalSupply: validatedData.totalSupply,
-        imageUrl: validatedData.imageUrl || '',
-        description: validatedData.description || '',
-        publicKey: validatedData.publicKey
-      },
-      validatedData.initialSol,
-      validatedData.totalSupply
-    );
+    // const blockchainResult = await createTokenWithPoolTransaction(
+    //   {
+    //     name: validatedData.name,
+    //     symbol: validatedData.symbol,
+    //     decimals: validatedData.decimals,
+    //     totalSupply: validatedData.totalSupply,
+    //     imageUrl: validatedData.imageUrl || '',
+    //     description: validatedData.description || '',
+    //     publicKey: validatedData.publicKey
+    //   },
+    //   validatedData.initialSol,
+    //   validatedData.totalSupply
+    // );
 
-    console.log("Token transaction prepared:", blockchainResult.transactionData.mintAddress);
+    // console.log("Token transaction prepared:", blockchainResult.transactionData.mintAddress);
 
-    return res.status(200).json({
-      message: "Token transaction prepared successfully",
-      transactionData: blockchainResult.transactionData,
-      poolAddress: blockchainResult.poolAddress,
-      tokenPrice: blockchainResult.tokenPrice,
-      tokenParams: {
-        name: validatedData.name,
-        symbol: validatedData.symbol,
-        description: validatedData.description,
-        imageUrl: validatedData.imageUrl,
-        totalSupply: validatedData.totalSupply,
-        decimals: validatedData.decimals,
-        pricingModel: validatedData.pricingModel,
-        fixedPrice: validatedData.fixedPrice,
-        features: validatedData.features
-      }
-    });
+    // return res.status(200).json({
+    //   message: "Token transaction prepared successfully",
+    //   transactionData: blockchainResult.transactionData,
+    //   poolAddress: blockchainResult.poolAddress,
+    //   tokenPrice: blockchainResult.tokenPrice,
+    //   tokenParams: {
+    //     name: validatedData.name,
+    //     symbol: validatedData.symbol,
+    //     description: validatedData.description,
+    //     imageUrl: validatedData.imageUrl,
+    //     totalSupply: validatedData.totalSupply,
+    //     decimals: validatedData.decimals,
+    //     pricingModel: validatedData.pricingModel,
+    //     fixedPrice: validatedData.fixedPrice,
+    //     features: validatedData.features
+    //   }
+    // });
 
   } catch (error: any) {
     console.error("Error creating token transaction:", error);

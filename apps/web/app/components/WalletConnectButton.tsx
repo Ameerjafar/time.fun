@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Wallet } from 'lucide-react';
 import { useState, useEffect } from 'react';
 
 interface WalletConnectButtonProps {
@@ -11,10 +11,10 @@ interface WalletConnectButtonProps {
   showStatus?: boolean;
 }
 
-export const WalletConnectButton = ({ 
-  variant = 'default', 
+export const WalletConnectButton = ({
+  variant = 'default',
   className = '',
-  showStatus = true 
+  showStatus = true
 }: WalletConnectButtonProps) => {
   const { connected, publicKey } = useWallet();
   const [isClient, setIsClient] = useState(false);
@@ -30,7 +30,8 @@ export const WalletConnectButton = ({
           <WalletMultiButton className="!bg-secondary/10 !text-secondary !border-secondary/20 hover:!bg-secondary/20 !rounded-lg !font-medium !justify-center !py-2 !px-4 !text-sm" />
         ) : (
           <div className="bg-secondary/10 text-secondary border border-secondary/20 rounded-lg font-medium justify-center py-2 px-4 text-sm h-9 flex items-center">
-            Select Wallet
+            <Wallet className="w-5 h-5" />
+            Connect Wallet
           </div>
         )}
         {isClient && showStatus && connected && publicKey && (
@@ -70,7 +71,7 @@ export const WalletConnectButton = ({
           Select Wallet
         </div>
       )}
-      
+
       {isClient && showStatus && connected && publicKey && (
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}

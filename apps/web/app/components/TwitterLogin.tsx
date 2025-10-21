@@ -1,6 +1,6 @@
 "use client";
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Twitter, Loader2 } from 'lucide-react';
 
 interface TwitterLoginProps {
@@ -13,8 +13,7 @@ export const TwitterLogin = ({
   className = ''
 }: TwitterLoginProps) => {
   const [isLoading, setIsLoading] = useState(false);
-  const TWITTER_CLIENT_ID = process.env.NEXT_PUBLIC_TWITTER_CLIENT_ID!;
-  console.log("this is twitter client id", TWITTER_CLIENT_ID);
+  
   function generateCodeVerifier(length = 128) {
     const characters =
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
@@ -42,12 +41,13 @@ export const TwitterLogin = ({
   }
 
   const handleTwitterLogin = async () => {
-    console.log("this is twitter login hello");
+    const TWITTER_CLIENT_ID = process.env.NEXT_PUBLIC_TWITTER_CLIENT_ID;  
+    console.log("this is twitter login hello" , TWITTER_CLIENT_ID);
     if (!TWITTER_CLIENT_ID) {
       console.error('Twitter Client ID not found');
       alert('Twitter OAuth is not configured. Please contact the administrator.');
       return;
-    }
+    } 
 
     setIsLoading(true);
     
